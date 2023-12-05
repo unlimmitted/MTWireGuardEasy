@@ -6,14 +6,8 @@ services:
     build: ./services/backend
     ports:
       - 8000:8000
-#    volumes:
-#      - ./services/backend:/app
-#    command: uvicorn src.main:app --reload --host 0.0.0.0 --port 5000
 
   frontend:
     build: ./services/frontend
-#    volumes:
-#      - './services/frontend:/app'
-#      - '/app/node_modules'
     ports:
       - 8080:8080
