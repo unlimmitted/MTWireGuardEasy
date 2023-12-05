@@ -1,0 +1,27 @@
+{
+  "name": "wgwm-front",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite --host 0.0.0.0 --port 8080",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "@vue/cli": "^5.0.8",
+    "@vue/cli-service": "^5.0.8",
+    "@vue/server-renderer": "^3.3.10",
+    "express": "^4.18.2",
+    "qrcode.vue": "^3.4.1",
+    "ssr": "^6.2.64",
+    "vue": "^3.3.10",
+    "vue-cookies": "^1.8.3",
+    "vue-loader": "^17.3.1",
+    "vue-template-compiler": "^2.7.15"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-vue": "^4.5.1",
+    "vite": "^4.4.11"
+  }
+}
