@@ -39,7 +39,7 @@ export default {
   },
   data() {
     return {
-      serverUrl: 'http://192.168.0.102:8000',
+      serverUrl: 'http://<ip address of your computer>:8000',
       errors: [],
       wgPeers: [],
       authErrors: ""
