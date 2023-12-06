@@ -2,8 +2,8 @@
   <div class="inner cover">
     <div class="text-center">
       <form class="form-signin">
-<!--        <img class="mb-4" src="src/assets/logo.png" alt="" width="230"-->
-<!--             height="100">-->
+        <img class="mb-4" src="/public/logo.png" alt="" width="230"
+             height="100">
         <h1 class="h3 mb-3 font-weight-normal">Connect to MikroTik</h1>
         <div class="checkbox mb-3" v-if="authErrors !== '' ">
           <div class="authErrors" style="background-color: #DC143C; border-radius: 5px; padding: 3px">
