@@ -1,10 +1,12 @@
 FROM node:lts-alpine
 
-RUN npm install -g http-server
+RUN apk add --no-cache git
+RUN git clone https://github.com/unlimmitted/MTWireGuardEasy-frontend.git
 
 WORKDIR /app/MTWireGuardEasy-frontend/
 COPY package*.json ./
 
+RUN npm install http-server
 RUN npm install vite
 RUN npm install
 
