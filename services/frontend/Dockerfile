@@ -3,6 +3,7 @@ FROM node:lts-alpine
 RUN npm install -g http-server
 
 WORKDIR /app
+RUN git clone https://github.com/unlimmitted/MTWireGuardEasy-frontend.git
 
 COPY package*.json ./
 
