@@ -1,6 +1,6 @@
 # MTWireGuardEasy
 
-##Install
+## Install
 Cloning this repository
 ```console
 git clone https://github.com/unlimmitted/MTWireGuardEasy.git
@@ -26,13 +26,13 @@ nano Main.vue
 
 ![image](https://github.com/unlimmitted/MTWireGuardEasy/assets/108941648/5458be9a-ea27-44a1-adf1-b28b8d29c3a2)
 
-##Run
+## Run
 To run the application, run the command in the root directory:
 ```console
 sudo docker-compose up -d --build
 ```
 
-##Update
+## Update
 
 In root directory:
 ```console
