@@ -4,10 +4,11 @@ WORKDIR /app
 RUN apk add --no-cache git
 RUN git clone https://github.com/unlimmitted/MTWireGuardEasy-frontend.git
 
+RUN npm install -g http-server
+
 WORKDIR /app/MTWireGuardEasy-frontend/
 COPY package*.json ./
 
-RUN npm install http-server
 RUN npm install vite
 RUN npm install
 
