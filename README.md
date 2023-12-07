@@ -29,3 +29,12 @@ To run the application, run the command in the root directory:
 ```console
 sudo docker-compose up -d --build
 ```
+
+Update
+In root directory:
+```console
+git pull
+```
+```console
+sudo docker-compose up -d --build
+```
