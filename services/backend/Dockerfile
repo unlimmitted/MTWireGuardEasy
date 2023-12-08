@@ -1,6 +1,6 @@
 FROM python:3.11
 RUN mkdir /code
-RUN apk add --no-cache git
+RUN apt-get git
 RUN git pull
 WORKDIR /code
 COPY ./requirements.txt /code/requirements.txt
