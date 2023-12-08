@@ -18,5 +18,4 @@ class VpnChangeRouteBody(BaseModel):
 
 
 class ConfigValue(BaseModel):
-    comment: str
     value: str

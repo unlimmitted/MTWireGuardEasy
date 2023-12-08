@@ -94,4 +94,4 @@ async def check_auth_status(verify_token: authModels.VerifyToken):
 async def download_config(config: peerModels.ConfigValue):
     with open('config.conf', 'w') as f:
         f.write(config.value)
-    return FileResponse(path='config.conf', filename=f'{config.comment}.conf', media_type='multipart/form-data')
+    return FileResponse(path='config.conf', filename=f'config.conf', media_type='multipart/form-data')
