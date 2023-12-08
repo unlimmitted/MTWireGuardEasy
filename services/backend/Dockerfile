@@ -1,8 +1,5 @@
 FROM python:3.11
 
-CMD apt install git -y
-RUN git pull
-
 RUN mkdir /code
 WORKDIR /code
 
