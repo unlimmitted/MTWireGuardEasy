@@ -7,7 +7,7 @@ from starlette import status
 from controllers.mikrotik_movements import authenticate_user, MikroTik
 from controllers.mikrotik_movements import response, mikrotik_user
 from models import authModels, peerModels, errorModels, settingsModels
-
+from fastapi.responses import FileResponse
 
 SECRET_KEY = os.environ["SECRET_KEY"]
 ALGORITHM = os.environ["ALGORITHM"]
@@ -88,3 +88,10 @@ async def check_auth_status(verify_token: authModels.VerifyToken):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             headers={"WWW-Authenticate": "Bearer"})
+
+
+@router.post("/download-config")
+async def download_config(config: peerModels.ConfigValue):
+    with open('config.conf', 'w') as f:
+        f.write(config.value)
+    return FileResponse(path='config.conf', filename=f'{config.comment}.conf', media_type='multipart/form-data')

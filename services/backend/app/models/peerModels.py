@@ -15,3 +15,8 @@ class VpnChangeRouteBody(BaseModel):
     status: bool
     id: str
     token: str | None
+
+
+class ConfigValue(BaseModel):
+    comment: str
+    value: str
