@@ -2,12 +2,9 @@ import json
 import logging
 import os
 import time
-
 import jwt
 import pywgkey
 import routeros_api
-from fastapi import HTTPException
-from starlette import status
 from controllers.configurator import Configurator
 from cryptography.fernet import Fernet
 
@@ -44,10 +41,9 @@ class MikroTik:
                 plaintext_login=True)
             self.api = connect.get_api()
             return True
-        except Exception:
-            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED,
-                                detail="Authentication required",
-                                headers={"WWW-Authenticate": "Bearer"})
+        except Exception as error:
+            print(error)
+            return "UNAUTHORIZED", 401
 
     def try_get_settings(self):
         try:
@@ -137,7 +133,7 @@ class MikroTik:
         get_duplicate = self.api.get_resource('/interface/wireguard/peers').get()
         peers = self.check_peer_comment(get_duplicate)
         for index, client in enumerate(peers):
-            if peer.comment == client.get("comment").split('\n')[0]:
+            if peer.get("comment") == client.get("comment").split('\n')[0]:
                 response["errors"].append({"error": "Peer already exists"})
                 return response
         keys_pair = pywgkey.WgKey()
@@ -146,32 +142,32 @@ class MikroTik:
         addresses_to_vpn = self.api.get_resource("/ip/firewall/address-list/")
         wg_peers.add(
             interface="WG-WebMode-Easy-wg-in",
-            comment=f"{peer.comment}\n {keys_pair.privkey}",
+            comment=f"{peer.get('comment')}\n {keys_pair.privkey}",
             public_key=keys_pair.pubkey,
             allowed_address=client_ip,
             persistent_keepalive='00:00:20')
         addresses_to_vpn.add(address=client_ip.split("/")[0], list='WG-WebMode-Easy-ToVpn-Addresses',
-                             comment=peer.comment)
+                             comment=peer.get("comment"))
         return self.list_peers()
 
     def change_vpn_route(self, peer_vpn):
         addresses_to_vpn = self.api.get_resource("/ip/firewall/address-list/")
-        peer_vpn_status = peer_vpn.status
-        id_peer = peer_vpn.id
+        peer_vpn_status = peer_vpn.get("status")
+        id_peer = peer_vpn.get("id")
         if peer_vpn_status:
             addresses_to_vpn.call('disable', {'numbers': self.get_id_address_list(id_peer)})
         else:
             addresses_to_vpn.call('enable', {'numbers': self.get_id_address_list(id_peer)})
 
     def set_settings(self, settings):
-        port_forward_mode = settings.portForward
-        preshared_key = settings.presharedKey
-        del settings.portForward, settings.presharedKey
+        port_forward_mode = settings.get("portForward")
+        preshared_key = settings.get("presharedKey")
+        del settings["portForward"], settings["presharedKey"]
         for index, value in enumerate(list(settings)):
             if list(settings)[index][-1] == "":
                 response["errors"].append({"error": "Not all parameters are specified"})
                 return response
-        settings.presharedKey = preshared_key
+        settings["presharedKey"] = preshared_key
         self.api.get_resource('/file').add(
             name='WG-WebMode-Settings.txt',
             contents=str(dict(settings)).replace("'", "\""))
