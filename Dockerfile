@@ -22,6 +22,7 @@ RUN pip install --upgrade pip
 RUN pip install --no-cache-dir --upgrade -r /code/requirements.txt
 COPY . .
 
-COPY --from=build-stage /MTWireGuardEasy-frontend/dist/* /code/templates/dist
+COPY --from=build-stage /MTWireGuardEasy-frontend/dist/* /code/templates/
+COPY --from=build-stage /MTWireGuardEasy-frontend/dist/static/* /code/templates/static/
 
 CMD [ "python3", "-m" , "flask", "run", "--host=0.0.0.0"]

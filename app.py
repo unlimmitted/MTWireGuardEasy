@@ -94,7 +94,7 @@ def download_config():
 
 @app.route('/favicon.png')
 def favicon():
-    return send_from_directory(os.path.join(app.root_path, 'templates/dist/'),
+    return send_from_directory(os.path.join(app.root_path, 'templates/'),
                                'favicon.png', mimetype='image/vnd.microsoft.icon')
 
 
