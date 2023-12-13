@@ -1,5 +1,9 @@
-#MTWireGuardEasy
+# MTWireGuardEasy
 
+Cloning
+```console
+git clone https://github.com/unlimmitted/MTWireGuardEasy.git
+```
 
 Build
 ```console
