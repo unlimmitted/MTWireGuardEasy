@@ -1,5 +1,8 @@
 # MTWireGuardEasy
 
+![logo](https://github.com/unlimmitted/MTWireGuardEasy/assets/108941648/7b2ae56c-4649-44d3-91c8-9036621109f3)
+
+
 Cloning
 ```console
 git clone https://github.com/unlimmitted/MTWireGuardEasy.git
