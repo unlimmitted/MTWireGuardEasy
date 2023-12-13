@@ -6,7 +6,7 @@ from flask import Flask, render_template, request, send_file, url_for, send_from
 from controllers.mikrotik_movements import authenticate_user, MikroTik
 from controllers.mikrotik_movements import response, mikrotik_user
 
-app = Flask(__name__, static_folder='templates/dist/static')
+app = Flask(__name__, static_folder='templates/static')
 app.config['SEND_FILE_MAX_AGE_DEFAULT'] = 0
 
 SECRET_KEY = os.environ["SECRET_KEY"]
@@ -15,7 +15,7 @@ ALGORITHM = os.environ["ALGORITHM"]
 
 @app.route('/')
 def render_frontend():
-    return render_template('dist/index.html')
+    return render_template('index.html')
 
 
 @app.route('/api/v1/peers', methods=['POST'])
