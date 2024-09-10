@@ -21,9 +21,9 @@ class ApiController {
 		return ResponseEntity.ok().body(mikroTikService.getPeers())
 	}
 
-	@GetMapping("/get-wg-interfaces")
-	ResponseEntity<Object> getWgInterfaces() {
-		return ResponseEntity.ok().body(mikroTikService.getInterfaces())
+	@GetMapping("/get-mikrotik-info")
+	ResponseEntity<Object> getMikroTikInfo() {
+		return ResponseEntity.ok().body(mikroTikService.getMtInfo())
 	}
 
 }

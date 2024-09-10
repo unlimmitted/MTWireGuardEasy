@@ -4,20 +4,25 @@ import com.fasterxml.jackson.databind.ObjectMapper
 import me.legrange.mikrotik.ApiConnection
 import org.springframework.stereotype.Service
 import ru.unlimmitted.mtwgeasy.dto.AddressList
+import ru.unlimmitted.mtwgeasy.dto.MtInfo
 import ru.unlimmitted.mtwgeasy.dto.MtSettings
 import ru.unlimmitted.mtwgeasy.dto.Peer
 import ru.unlimmitted.mtwgeasy.dto.WgInterface
 
+import java.util.regex.Matcher
+import java.util.regex.Pattern
+
 @Service
 class MikroTikService {
 
-	private ApiConnection connect
-	private MtSettings settings
+	ApiConnection connect
+	MtSettings settings
 
 	void connectToMikroTik() {
 		try {
 			connect = ApiConnection.connect(System.getenv("GATEWAY"))
 			connect.login(System.getenv("MIKROTIK_USER"), System.getenv("MIKROTIK_PASSWORD"))
+			this.readSettings()
 		} catch (exception) {
 			println(exception)
 		}
@@ -122,8 +127,30 @@ class MikroTikService {
 		return settings
 	}
 
+	Integer getNewIp() {
+		List<Integer> results = new ArrayList<>()
+		connect.execute("/interface/wireguard/peers/print").forEach {
+			String regex = "(?:\\d+\\.){3}(\\d{1,3})\\/\\d+"
+			Pattern pattern = Pattern.compile(regex)
+			Matcher matcher = pattern.matcher(it.get('allowed-address'))
+			if (matcher.find()) {
+				results.add(matcher.group(1).toInteger())
+			}
+		}
+		return results.max() + 1
+	}
+
+	MtInfo getMtInfo() {
+		MtInfo mtInfo = new MtInfo()
+		connect.execute('/system/routerboard/print').forEach {
+			mtInfo.routerBoard = it.get('board-name')
+			mtInfo.version = it.get('upgrade-firmware')
+			mtInfo.interfaces = getInterfaces()
+		}
+		return mtInfo
+	}
+
 	MikroTikService() {
 		this.connectToMikroTik()
-		this.readSettings()
 	}
 }

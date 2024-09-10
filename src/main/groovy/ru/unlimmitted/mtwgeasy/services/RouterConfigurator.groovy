@@ -1,4 +1,7 @@
 package ru.unlimmitted.mtwgeasy.services
 
-class RouterConfigurator {
+class RouterConfigurator extends MikroTikService {
+	RouterConfigurator() {
+		super()
+	}
 }
