@@ -1,7 +1,7 @@
 package ru.unlimmitted.mtwgeasy.dto
 
 class Peer {
-
+	String id
 	String name
 	String peerInterface
 	String publicKey

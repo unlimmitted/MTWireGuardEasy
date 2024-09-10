@@ -3,11 +3,7 @@ package ru.unlimmitted.mtwgeasy.services
 import com.fasterxml.jackson.databind.ObjectMapper
 import me.legrange.mikrotik.ApiConnection
 import org.springframework.stereotype.Service
-import ru.unlimmitted.mtwgeasy.dto.AddressList
-import ru.unlimmitted.mtwgeasy.dto.MtInfo
-import ru.unlimmitted.mtwgeasy.dto.MtSettings
-import ru.unlimmitted.mtwgeasy.dto.Peer
-import ru.unlimmitted.mtwgeasy.dto.WgInterface
+import ru.unlimmitted.mtwgeasy.dto.*
 
 import java.util.regex.Matcher
 import java.util.regex.Pattern
@@ -22,7 +18,7 @@ class MikroTikService {
 		try {
 			connect = ApiConnection.connect(System.getenv("GATEWAY"))
 			connect.login(System.getenv("MIKROTIK_USER"), System.getenv("MIKROTIK_PASSWORD"))
-			this.readSettings()
+			readSettings()
 		} catch (exception) {
 			println(exception)
 		}
@@ -36,6 +32,7 @@ class MikroTikService {
 			if (comment != null && comment != "dont touch" && comment != "service") {
 				Peer peer = new Peer()
 
+				peer.setId(it.get(".id"))
 				peer.setAllowedAddress(it.get("allowed-address"))
 				peer.setTx(it.get("tx"))
 				peer.setLastHandshake(it.get("last-handshake"))
@@ -101,6 +98,7 @@ class MikroTikService {
 		List<AddressList> addressListList = new ArrayList<>()
 		connect.execute('/ip/firewall/address-list/print').forEach({
 			AddressList addressList = new AddressList()
+			addressList.setId(it.get('.id'))
 			addressList.setDisabled(it.get('disabled').toBoolean())
 			addressList.setComment(it.get('comment'))
 			addressList.setListName(it.get('list'))
@@ -150,7 +148,33 @@ class MikroTikService {
 		return mtInfo
 	}
 
+	void createNewPeer (String peerName) {
+		WireGuardKeyGen wireGuardKeyGen = new WireGuardKeyGen()
+		KeyPair keyPair = wireGuardKeyGen.keyPair()
+		String ip = "10.10.10.${getNewIp()}"
+		String peerQueryParams = "interface=${settings.localWgInterfaceName} comment=\"${keyPair.privateKey}\"" +
+				" public-key=\"${keyPair.publicKey}\" allowed-address=$ip/32" +
+				" persistent-keepalive='00:00:20' name=${peerName}"
+		connect.execute("/interface/wireguard/peers/add $peerQueryParams")
+		String addressListQueryParam = "address=$ip list=${settings.toVpnAddressList} comment=$peerName"
+		connect.execute("/ip/firewall/address-list/add $addressListQueryParam")
+	}
+
+	void changeRouting(Peer peer) {
+		String listId = findPeerInAddressList(peer.allowedAddress.split('/').first()).id
+		String queryParam = "${peer.doubleVpn ? 'disable' : 'enable'} numbers=$listId"
+		connect.execute("/ip/firewall/address-list/$queryParam")
+	}
+
+	void removePeer(Peer peer) {
+		String peerId = peer.id
+		String addressListId = findPeerInAddressList(peer.allowedAddress.split('/').first()).id
+		connect.execute("/interface/wireguard/peers/remove numbers=$peerId")
+		connect.execute("/ip/firewall/address-list/remove numbers=$addressListId")
+	}
+
 	MikroTikService() {
 		this.connectToMikroTik()
+		this.createNewPeer("alah")
 	}
 }
