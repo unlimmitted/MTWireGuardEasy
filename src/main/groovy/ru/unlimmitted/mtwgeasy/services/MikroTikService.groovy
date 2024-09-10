@@ -47,7 +47,7 @@ class MikroTikService {
 
 				peer.setCurrentEndpointPort(it.get("current-endpoint-port"))
 				peer.setCurrentEndpointAddress(it.get("current-endpoint-address"))
-				peer.setPublicKey(it.get("public-key"))
+				peer.setPublicKey(findInterface(it.get("interface")).publicKey)
 				peer.setPeerInterface(it.get("interface"))
 				peer.setPresharedKey(it.get("preshared-key"))
 

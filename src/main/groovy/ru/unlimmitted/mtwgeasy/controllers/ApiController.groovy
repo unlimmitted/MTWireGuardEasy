@@ -8,7 +8,6 @@ import ru.unlimmitted.mtwgeasy.services.MikroTikService
 
 @RestController
 @RequestMapping("/api/v1")
-@CrossOrigin
 class ApiController {
 
 	@Autowired
@@ -22,6 +21,11 @@ class ApiController {
 	@GetMapping("/get-mikrotik-info")
 	ResponseEntity<Object> getMikroTikInfo() {
 		return ResponseEntity.ok().body(mikroTikService.getMtInfo())
+	}
+
+	@GetMapping("/get-mikrotik-settings")
+	ResponseEntity<Object> getMikroTikSettings() {
+		return ResponseEntity.ok().body(mikroTikService.settings)
 	}
 
 	@PostMapping("/create-new-peer")
