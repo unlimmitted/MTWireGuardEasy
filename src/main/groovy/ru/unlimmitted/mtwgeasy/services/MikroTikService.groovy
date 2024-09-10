@@ -175,6 +175,5 @@ class MikroTikService {
 
 	MikroTikService() {
 		this.connectToMikroTik()
-		this.createNewPeer("alah")
 	}
 }
