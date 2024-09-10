@@ -1,8 +1,10 @@
 package ru.unlimmitted.mtwgeasy.services
 
+import com.fasterxml.jackson.databind.ObjectMapper
 import me.legrange.mikrotik.ApiConnection
 import org.springframework.stereotype.Service
 import ru.unlimmitted.mtwgeasy.dto.AddressList
+import ru.unlimmitted.mtwgeasy.dto.MtSettings
 import ru.unlimmitted.mtwgeasy.dto.Peer
 import ru.unlimmitted.mtwgeasy.dto.WgInterface
 
@@ -10,6 +12,7 @@ import ru.unlimmitted.mtwgeasy.dto.WgInterface
 class MikroTikService {
 
 	private ApiConnection connect
+	private MtSettings settings
 
 	void connectToMikroTik() {
 		try {
@@ -22,28 +25,48 @@ class MikroTikService {
 
 	List<Peer> getPeers() {
 		List<Peer> peers = new ArrayList<>()
-		connect.execute('/interface/wireguard/peers/print').forEach({
-			Peer peer = new Peer()
-			if (it['comment'] != 'dont touch' && it['comment'] != 'service') {
-				peer.allowedAddress = it['allowed-address']
-				peer.tx = it['tx']
-				peer.lastHandshake = it['last-handshake']
-				peer.rx = it['rx']
-				peer.privateKey = it['comment'].split('\n')[-1].replace(' ', '')
-				peer.currentEndpointPort = it['current-endpoint-port']
-				peer.currentEndpointAddress = it['current-endpoint-address']
-				peer.publicKey = it['public-key']
-				peer.peerInterface = it['interface']
-				peer.allowedAddress = it['allowed-address']
-				peer.presharedKey = it['preshared-key']
-				peer.comment = it['comment'].split('\n')[0]
-				peer.name = it['comment'].split('\n')[0]
-//				peer.endpoint = Из настроек придется брать
-				peer.endpointPort = findInterface(it['interface']).listenPort
-				peer.doubleVpn = !findPeerInAddressList(it['allowed-address'].split('/')[0]).disabled
+
+		connect.execute("/interface/wireguard/peers/print").forEach((Map<String, String> it) -> {
+			String comment = it.get("comment")
+			if (comment != null && comment != "dont touch" && comment != "service") {
+				Peer peer = new Peer()
+
+				peer.setAllowedAddress(it.get("allowed-address"))
+				peer.setTx(it.get("tx"))
+				peer.setLastHandshake(it.get("last-handshake"))
+				peer.setRx(it.get("rx"))
+
+				String[] commentParts = comment.split("\n")
+				if (commentParts.length > 1) {
+					peer.setPrivateKey(commentParts[commentParts.length - 1].replace(" ", ""))
+					peer.setName(commentParts[0])
+					peer.setComment(commentParts[0])
+				}
+
+				peer.setCurrentEndpointPort(it.get("current-endpoint-port"))
+				peer.setCurrentEndpointAddress(it.get("current-endpoint-address"))
+				peer.setPublicKey(it.get("public-key"))
+				peer.setPeerInterface(it.get("interface"))
+				peer.setPresharedKey(it.get("preshared-key"))
+
+				peer.setEndpoint(settings.getEndpoint())
+				WgInterface wgInterface = findInterface(it.get("interface"))
+				if (wgInterface != null) {
+					peer.setEndpointPort(wgInterface.getListenPort())
+				}
+
+				String[] allowedAddressParts = it.get("allowed-address").split("/")
+				if (allowedAddressParts.length > 0) {
+					AddressList addressEntry = findPeerInAddressList(allowedAddressParts[0])
+					if (addressEntry != null) {
+						peer.setDoubleVpn(!addressEntry.disabled)
+					}
+				}
+
 				peers.add(peer)
 			}
 		})
+
 		return peers
 	}
 
@@ -51,13 +74,13 @@ class MikroTikService {
 		List<WgInterface> wgInterfaces = new ArrayList<>()
 		connect.execute('/interface/wireguard/print').forEach({
 			WgInterface wgInterface = new WgInterface()
-			wgInterface.name = it['name']
-			wgInterface.running = it['running'].toBoolean()
-			wgInterface.privateKey = it['private-key']
-			wgInterface.publicKey = it['public-key']
-			wgInterface.disabled = it['disabled'].toBoolean()
-			wgInterface.listenPort = it['listen-port']
-			wgInterface.mtu = it['mtu']
+			wgInterface.setName(it.get('name'))
+			wgInterface.setRunning(it.get('running').toBoolean())
+			wgInterface.setPrivateKey(it.get('private-key'))
+			wgInterface.setPublicKey(it.get('public-key'))
+			wgInterface.setDisabled(it.get('disabled').toBoolean())
+			wgInterface.setListenPort(it.get('listen-port'))
+			wgInterface.setMtu(it.get('mtu'))
 			wgInterfaces.add(wgInterface)
 		})
 		return wgInterfaces
@@ -65,7 +88,7 @@ class MikroTikService {
 
 	WgInterface findInterface(String interfaceName) {
 		return getInterfaces().find({
-			it.name = interfaceName
+			it.name == interfaceName
 		})
 	}
 
@@ -73,10 +96,10 @@ class MikroTikService {
 		List<AddressList> addressListList = new ArrayList<>()
 		connect.execute('/ip/firewall/address-list/print').forEach({
 			AddressList addressList = new AddressList()
-			addressList.disabled = it['disabled'].toBoolean()
-			addressList.comment = it['comment']
-			addressList.listName = it['list']
-			addressList.address = it['address']
+			addressList.setDisabled(it.get('disabled').toBoolean())
+			addressList.setComment(it.get('comment'))
+			addressList.setListName(it.get('list'))
+			addressList.setAddress(it.get('address'))
 			addressListList.add(addressList)
 		})
 		return addressListList
@@ -84,11 +107,23 @@ class MikroTikService {
 
 	AddressList findPeerInAddressList(String address) {
 		return getAddressList().find({
-			it['address'] = address
+			it.address == address
 		})
+	}
+
+	MtSettings readSettings() {
+		ObjectMapper objectMapper = new ObjectMapper()
+		settings = objectMapper.readValue(
+				connect.execute('/file/print').find {
+					it.name == 'WG-WebMode-Settings.conf'
+				}.contents,
+				MtSettings.class
+		)
+		return settings
 	}
 
 	MikroTikService() {
 		this.connectToMikroTik()
+		this.readSettings()
 	}
 }
