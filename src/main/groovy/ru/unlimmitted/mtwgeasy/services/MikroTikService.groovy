@@ -13,23 +13,28 @@ class MikroTikService {
 
 	ApiConnection connect
 	MtSettings settings
+	List<WgInterface> wgInterfaces
 
-	void connectToMikroTik() {
+	MikroTikService() {
 		try {
 			connect = ApiConnection.connect(System.getenv("GATEWAY"))
 			connect.login(System.getenv("MIKROTIK_USER"), System.getenv("MIKROTIK_PASSWORD"))
-			readSettings()
+			settings = readSettings()
+			wgInterfaces = getInterfaces()
 		} catch (exception) {
-			println(exception)
+			throw new RuntimeException(exception)
 		}
 	}
 
 	List<Peer> getPeers() {
-		List<Peer> peers = new ArrayList<>()
+		List<AddressList> lists = getAddressList()
 
-		connect.execute("/interface/wireguard/peers/print").forEach((Map<String, String> it) -> {
-			String comment = it.get("comment")
-			if (comment != null && comment != "dont touch" && comment != "service") {
+		List<Peer> peers = connect.execute("/interface/wireguard/peers/print").findAll {
+			it != null
+			it.comment != null && it.comment != "dont touch" && it.comment != "service"
+		}.collect {
+			Map<String, String> it ->
+				String comment = it.get("comment")
 				Peer peer = new Peer()
 
 				peer.setId(it.get(".id"))
@@ -59,15 +64,13 @@ class MikroTikService {
 
 				String[] allowedAddressParts = it.get("allowed-address").split("/")
 				if (allowedAddressParts.length > 0) {
-					AddressList addressEntry = findPeerInAddressList(allowedAddressParts[0])
+					AddressList addressEntry = findPeerInAddressList(lists, allowedAddressParts.first())
 					if (addressEntry != null) {
 						peer.setDoubleVpn(!addressEntry.disabled)
 					}
 				}
-
-				peers.add(peer)
-			}
-		})
+				return peer
+		}
 
 		return peers
 	}
@@ -89,7 +92,7 @@ class MikroTikService {
 	}
 
 	WgInterface findInterface(String interfaceName) {
-		return getInterfaces().find({
+		return wgInterfaces.find({
 			it.name == interfaceName
 		})
 	}
@@ -108,21 +111,20 @@ class MikroTikService {
 		return addressListList
 	}
 
-	AddressList findPeerInAddressList(String address) {
-		return getAddressList().find({
+	static AddressList findPeerInAddressList(List<AddressList> lists, String address) {
+		return lists.find({
 			it.address == address
 		})
 	}
 
 	MtSettings readSettings() {
 		ObjectMapper objectMapper = new ObjectMapper()
-		settings = objectMapper.readValue(
+		return objectMapper.readValue(
 				connect.execute('/file/print').find {
 					it.name == 'WG-WebMode-Settings.conf'
 				}.contents,
 				MtSettings.class
 		)
-		return settings
 	}
 
 	Integer getNewIp() {
@@ -148,7 +150,7 @@ class MikroTikService {
 		return mtInfo
 	}
 
-	void createNewPeer (String peerName) {
+	void createNewPeer(String peerName) {
 		WireGuardKeyGen wireGuardKeyGen = new WireGuardKeyGen()
 		KeyPair keyPair = wireGuardKeyGen.keyPair()
 		String ip = "10.10.10.${getNewIp()}"
@@ -161,19 +163,18 @@ class MikroTikService {
 	}
 
 	void changeRouting(Peer peer) {
-		String listId = findPeerInAddressList(peer.allowedAddress.split('/').first()).id
+		List<AddressList> lists = getAddressList()
+		String listId = findPeerInAddressList(lists, peer.allowedAddress.split('/').first()).id
 		String queryParam = "${peer.doubleVpn ? 'disable' : 'enable'} numbers=$listId"
 		connect.execute("/ip/firewall/address-list/$queryParam")
 	}
 
 	void removePeer(Peer peer) {
 		String peerId = peer.id
-		String addressListId = findPeerInAddressList(peer.allowedAddress.split('/').first()).id
+		List<AddressList> lists = getAddressList()
+		String addressListId = findPeerInAddressList(lists, peer.allowedAddress.split('/').first()).id
 		connect.execute("/interface/wireguard/peers/remove numbers=$peerId")
 		connect.execute("/ip/firewall/address-list/remove numbers=$addressListId")
 	}
 
-	MikroTikService() {
-		this.connectToMikroTik()
-	}
 }
