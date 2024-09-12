@@ -30,7 +30,7 @@ class ApiController {
 
 	@PostMapping("/create-new-peer")
 	ResponseEntity<Object> createNewPeer(@RequestBody String peerName) {
-		mikroTikService.createNewPeer(peerName)
+		mikroTikService.createNewPeer(peerName.replace("=", ""))
 		return ResponseEntity.ok().body(mikroTikService.getPeers())
 	}
 

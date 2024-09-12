@@ -1,6 +1,6 @@
 package ru.unlimmitted.mtwgeasy.services
 
-import com.fasterxml.jackson.databind.ObjectMapper
+
 import me.legrange.mikrotik.ApiConnection
 import org.springframework.stereotype.Service
 import ru.unlimmitted.mtwgeasy.dto.*
@@ -9,27 +9,23 @@ import java.util.regex.Matcher
 import java.util.regex.Pattern
 
 @Service
-class MikroTikService {
+class MikroTikService extends MikroTikExecutor {
 
 	ApiConnection connect
 	MtSettings settings
 	List<WgInterface> wgInterfaces
 
 	MikroTikService() {
-		try {
-			connect = ApiConnection.connect(System.getenv("GATEWAY"))
-			connect.login(System.getenv("MIKROTIK_USER"), System.getenv("MIKROTIK_PASSWORD"))
-			settings = readSettings()
-			wgInterfaces = getInterfaces()
-		} catch (exception) {
-			throw new RuntimeException(exception)
-		}
+		super()
+		connect = super.connect
+		settings = super.settings
+		wgInterfaces = super.wgInterfaces
 	}
 
 	List<Peer> getPeers() {
 		List<AddressList> lists = getAddressList()
 
-		List<Peer> peers = connect.execute("/interface/wireguard/peers/print").findAll {
+		List<Peer> peers = executeCommand("/interface/wireguard/peers/print").findAll {
 			it != null
 			it.comment != null && it.comment != "dont touch" && it.comment != "service"
 		}.collect {
@@ -37,58 +33,46 @@ class MikroTikService {
 				String comment = it.get("comment")
 				Peer peer = new Peer()
 
-				peer.setId(it.get(".id"))
-				peer.setAllowedAddress(it.get("allowed-address"))
-				peer.setTx(it.get("tx"))
-				peer.setLastHandshake(it.get("last-handshake"))
-				peer.setRx(it.get("rx"))
+				peer.id = it.get(".id")
+				peer.allowedAddress = it.get("allowed-address")
+				peer.tx = it.get("tx")
+				peer.lastHandshake = it.get("last-handshake")
+				peer.rx = it.get("rx")
 
 				String[] commentParts = comment.split("\n")
 				if (commentParts.length > 1) {
-					peer.setPrivateKey(commentParts[commentParts.length - 1].replace(" ", ""))
-					peer.setName(commentParts[0])
-					peer.setComment(commentParts[0])
+					peer.privateKey = commentParts[commentParts.length - 1].replace(" ", "")
+					peer.name = commentParts.first()
+					peer.comment = commentParts.first() // TODO full swap to name
+				} else {
+					peer.privateKey = it.get('comment')
+					peer.name = it.get("name")
+					peer.comment = it.get("name") // TODO full swap to name
 				}
 
-				peer.setCurrentEndpointPort(it.get("current-endpoint-port"))
-				peer.setCurrentEndpointAddress(it.get("current-endpoint-address"))
-				peer.setPublicKey(findInterface(it.get("interface")).publicKey)
-				peer.setPeerInterface(it.get("interface"))
-				peer.setPresharedKey(it.get("preshared-key"))
+				peer.currentEndpointPort = it.get("current-endpoint-port")
+				peer.currentEndpointAddress = it.get("current-endpoint-address")
+				peer.publicKey = findInterface(it.get("interface")).publicKey
+				peer.peerInterface = it.get("interface")
+				peer.presharedKey = it.get("preshared-key")
 
-				peer.setEndpoint(settings.getEndpoint())
+				peer.endpoint = settings.getEndpoint()
 				WgInterface wgInterface = findInterface(it.get("interface"))
 				if (wgInterface != null) {
-					peer.setEndpointPort(wgInterface.getListenPort())
+					peer.endpointPort = wgInterface.getListenPort()
 				}
 
 				String[] allowedAddressParts = it.get("allowed-address").split("/")
 				if (allowedAddressParts.length > 0) {
 					AddressList addressEntry = findPeerInAddressList(lists, allowedAddressParts.first())
 					if (addressEntry != null) {
-						peer.setDoubleVpn(!addressEntry.disabled)
+						peer.doubleVpn = !addressEntry.disabled
 					}
 				}
 				return peer
 		}
 
 		return peers
-	}
-
-	List<WgInterface> getInterfaces() {
-		List<WgInterface> wgInterfaces = new ArrayList<>()
-		connect.execute('/interface/wireguard/print').forEach({
-			WgInterface wgInterface = new WgInterface()
-			wgInterface.setName(it.get('name'))
-			wgInterface.setRunning(it.get('running').toBoolean())
-			wgInterface.setPrivateKey(it.get('private-key'))
-			wgInterface.setPublicKey(it.get('public-key'))
-			wgInterface.setDisabled(it.get('disabled').toBoolean())
-			wgInterface.setListenPort(it.get('listen-port'))
-			wgInterface.setMtu(it.get('mtu'))
-			wgInterfaces.add(wgInterface)
-		})
-		return wgInterfaces
 	}
 
 	WgInterface findInterface(String interfaceName) {
@@ -99,13 +83,13 @@ class MikroTikService {
 
 	List<AddressList> getAddressList() {
 		List<AddressList> addressListList = new ArrayList<>()
-		connect.execute('/ip/firewall/address-list/print').forEach({
+		executeCommand('/ip/firewall/address-list/print').forEach({
 			AddressList addressList = new AddressList()
-			addressList.setId(it.get('.id'))
-			addressList.setDisabled(it.get('disabled').toBoolean())
-			addressList.setComment(it.get('comment'))
-			addressList.setListName(it.get('list'))
-			addressList.setAddress(it.get('address'))
+			addressList.id = it.get('.id')
+			addressList.disabled = it.get('disabled').toBoolean()
+			addressList.comment = it.get('comment')
+			addressList.listName = it.get('list')
+			addressList.address = it.get('address')
 			addressListList.add(addressList)
 		})
 		return addressListList
@@ -117,19 +101,9 @@ class MikroTikService {
 		})
 	}
 
-	MtSettings readSettings() {
-		ObjectMapper objectMapper = new ObjectMapper()
-		return objectMapper.readValue(
-				connect.execute('/file/print').find {
-					it.name == 'WG-WebMode-Settings.conf'
-				}.contents,
-				MtSettings.class
-		)
-	}
-
 	Integer getNewIp() {
 		List<Integer> results = new ArrayList<>()
-		connect.execute("/interface/wireguard/peers/print").forEach {
+		executeCommand("/interface/wireguard/peers/print").forEach {
 			String regex = "(?:\\d+\\.){3}(\\d{1,3})\\/\\d+"
 			Pattern pattern = Pattern.compile(regex)
 			Matcher matcher = pattern.matcher(it.get('allowed-address'))
@@ -142,10 +116,10 @@ class MikroTikService {
 
 	MtInfo getMtInfo() {
 		MtInfo mtInfo = new MtInfo()
-		connect.execute('/system/routerboard/print').forEach {
+		executeCommand('/system/routerboard/print').forEach {
 			mtInfo.routerBoard = it.get('board-name')
 			mtInfo.version = it.get('upgrade-firmware')
-			mtInfo.interfaces = getInterfaces()
+			mtInfo.interfaces = wgInterfaces
 		}
 		return mtInfo
 	}
@@ -157,24 +131,24 @@ class MikroTikService {
 		String peerQueryParams = "interface=${settings.localWgInterfaceName} comment=\"${keyPair.privateKey}\"" +
 				" public-key=\"${keyPair.publicKey}\" allowed-address=$ip/32" +
 				" persistent-keepalive='00:00:20' name=${peerName}"
-		connect.execute("/interface/wireguard/peers/add $peerQueryParams")
+		executeCommand("/interface/wireguard/peers/add $peerQueryParams")
 		String addressListQueryParam = "address=$ip list=${settings.toVpnAddressList} comment=$peerName"
-		connect.execute("/ip/firewall/address-list/add $addressListQueryParam")
+		executeCommand("/ip/firewall/address-list/add $addressListQueryParam")
 	}
 
 	void changeRouting(Peer peer) {
 		List<AddressList> lists = getAddressList()
 		String listId = findPeerInAddressList(lists, peer.allowedAddress.split('/').first()).id
 		String queryParam = "${peer.doubleVpn ? 'disable' : 'enable'} numbers=$listId"
-		connect.execute("/ip/firewall/address-list/$queryParam")
+		executeCommand("/ip/firewall/address-list/$queryParam")
 	}
 
 	void removePeer(Peer peer) {
 		String peerId = peer.id
 		List<AddressList> lists = getAddressList()
 		String addressListId = findPeerInAddressList(lists, peer.allowedAddress.split('/').first()).id
-		connect.execute("/interface/wireguard/peers/remove numbers=$peerId")
-		connect.execute("/ip/firewall/address-list/remove numbers=$addressListId")
+		executeCommand("/interface/wireguard/peers/remove numbers=$peerId")
+		executeCommand("/ip/firewall/address-list/remove numbers=$addressListId")
 	}
 
 }
