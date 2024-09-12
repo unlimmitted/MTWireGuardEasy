@@ -18,7 +18,7 @@ class MikroTikExecutor {
 	void initializeConnection() {
 		try {
 			connect = ApiConnection.connect(System.getenv("GATEWAY"))
-			connect.timeout = 1000
+			connect.setTimeout(500)
 			connect.login(System.getenv("MIKROTIK_USER"), System.getenv("MIKROTIK_PASSWORD"))
 			settings = readSettings()
 			wgInterfaces = getInterfaces()
