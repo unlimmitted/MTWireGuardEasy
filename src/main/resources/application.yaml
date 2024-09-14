@@ -1,0 +1,7 @@
+#spring:
+#  application:
+#  name: MTWGEasy
+
+logging:
+  level:
+    org.springframework.security: DEBUG

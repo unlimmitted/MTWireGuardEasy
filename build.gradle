@@ -31,6 +31,8 @@ dependencies {
 	implementation 'me.legrange:mikrotik:3.0.7'
 
 	implementation 'org.springframework.boot:spring-boot-starter-thymeleaf'
+
+	implementation 'org.springframework.boot:spring-boot-starter-security'
 }
 
 tasks.named('test') {
