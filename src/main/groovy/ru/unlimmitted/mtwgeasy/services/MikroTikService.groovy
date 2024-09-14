@@ -1,6 +1,6 @@
 package ru.unlimmitted.mtwgeasy.services
 
-
+import com.fasterxml.jackson.databind.ObjectMapper
 import me.legrange.mikrotik.ApiConnection
 import org.springframework.stereotype.Service
 import ru.unlimmitted.mtwgeasy.dto.*
@@ -18,8 +18,35 @@ class MikroTikService extends MikroTikExecutor {
 	MikroTikService() {
 		super()
 		connect = super.connect
-		settings = super.settings
 		wgInterfaces = super.wgInterfaces
+		settings = readSettings()
+	}
+
+	MtSettings readSettings() {
+		ObjectMapper objectMapper = new ObjectMapper()
+		if (isSettings()) {
+			return objectMapper.readValue(
+					executeCommand('/file/print').find {
+						it.name == 'WGMTSettings.conf'
+					}.contents,
+					MtSettings.class
+			)
+		} else {
+			MtSettings mtSettings = new MtSettings()
+			return mtSettings
+		}
+	}
+
+	Boolean isSettings() {
+		Map<String, String> result = executeCommand('/file/print').find {
+			it.name == 'WGMTSettings.conf'
+		}
+		return result
+	}
+
+	static void runConfigurator(MtSettings settings) {
+		RouterConfigurator routerConfigurator = new RouterConfigurator(settings)
+		routerConfigurator.run()
 	}
 
 	List<Peer> getPeers() {

@@ -17,8 +17,8 @@ class CustomAuthenticationProvider implements AuthenticationProvider {
 		String username = authentication.getName()
 		String password = authentication.getCredentials().toString()
 
-		def envUser = System.getenv("MIKROTIK_USER")
-		def envPassword = System.getenv("MIKROTIK_PASSWORD")
+		String envUser = System.getenv("MIKROTIK_USER")
+		String envPassword = System.getenv("MIKROTIK_PASSWORD")
 
 		if (username == envUser && password == envPassword) {
 			List<GrantedAuthority> authorities = []

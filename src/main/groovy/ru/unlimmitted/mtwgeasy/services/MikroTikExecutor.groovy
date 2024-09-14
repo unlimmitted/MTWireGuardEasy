@@ -20,21 +20,10 @@ class MikroTikExecutor {
 			connect = ApiConnection.connect(System.getenv("GATEWAY"))
 			connect.setTimeout(500)
 			connect.login(System.getenv("MIKROTIK_USER"), System.getenv("MIKROTIK_PASSWORD"))
-			settings = readSettings()
 			wgInterfaces = getInterfaces()
 		} catch (Exception e) {
 			throw new RuntimeException("Failed to connect to MikroTik", e)
 		}
-	}
-
-	MtSettings readSettings() {
-		ObjectMapper objectMapper = new ObjectMapper()
-		return objectMapper.readValue(
-				executeCommand('/file/print').find {
-					it.name == 'WG-WebMode-Settings.conf'
-				}.contents,
-				MtSettings.class
-		)
 	}
 
 	List<WgInterface> getInterfaces() {

@@ -3,6 +3,7 @@ package ru.unlimmitted.mtwgeasy.controllers
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.annotation.*
+import ru.unlimmitted.mtwgeasy.dto.MtSettings
 import ru.unlimmitted.mtwgeasy.dto.Peer
 import ru.unlimmitted.mtwgeasy.services.MikroTikService
 
@@ -25,7 +26,11 @@ class ApiController {
 
 	@GetMapping("/get-mikrotik-settings")
 	ResponseEntity<Object> getMikroTikSettings() {
-		return ResponseEntity.ok().body(mikroTikService.settings)
+		if (mikroTikService.isSettings()) {
+			return ResponseEntity.ok().body(mikroTikService.settings)
+		} else {
+			return ResponseEntity.ok().body(false)
+		}
 	}
 
 	@PostMapping("/create-new-peer")
@@ -46,4 +51,9 @@ class ApiController {
 		return ResponseEntity.ok().body(mikroTikService.getPeers())
 	}
 
+	@PostMapping("/configurator")
+	ResponseEntity<Object> startConfigurator(@RequestBody MtSettings settings) {
+		mikroTikService.runConfigurator(settings)
+		return ResponseEntity.ok().body(mikroTikService.getPeers())
+	}
 }

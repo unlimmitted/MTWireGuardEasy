@@ -1,33 +1,22 @@
 package ru.unlimmitted.mtwgeasy.dto
 
+import com.fasterxml.jackson.databind.ObjectMapper
+
 class MtSettings {
-	String localWgInterfaceName = "WG-WebMode-Easy-wg-in"
-
-	String toVpnAddressList = "WG-WebMode-Easy-ToVpn-Addresses"
-
+	String localWgInterfaceName = "WGMTEasyIn"
+	String externalWgInterfaceName = "WGMTEasyOut"
+	String toVpnAddressList = "WGMTEasyToVpnAddresses"
+	String toVpnTableName = "WGMTEasyToVpnTable"
 	String localWgNetwork
-
 	String localWgEndpoint
-
 	String localWgEndpointPort
-
 	String localNetwork
-
 	String ipAddress
-
 	String allowedAddress
-
 	String endpoint
-
 	String endpointPort
-
 	String publicKey
-
 	String privateKey
-
 	String wanInterfaceName
-
-	String token
-
 	String presharedKey
 }
