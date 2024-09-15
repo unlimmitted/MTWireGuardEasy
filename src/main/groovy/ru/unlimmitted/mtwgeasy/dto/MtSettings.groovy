@@ -19,4 +19,5 @@ class MtSettings {
 	String privateKey
 	String wanInterfaceName
 	String presharedKey
+	Boolean vpnChainMode
 }

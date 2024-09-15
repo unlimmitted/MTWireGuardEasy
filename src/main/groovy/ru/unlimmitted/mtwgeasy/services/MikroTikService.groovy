@@ -28,7 +28,7 @@ class MikroTikService extends MikroTikExecutor {
 			return objectMapper.readValue(
 					executeCommand('/file/print').find {
 						it.name == 'WGMTSettings.conf'
-					}.contents,
+					}.contents.replace("\\\"", "\""),
 					MtSettings.class
 			)
 		} else {
@@ -54,10 +54,9 @@ class MikroTikService extends MikroTikExecutor {
 
 		List<Peer> peers = executeCommand("/interface/wireguard/peers/print").findAll {
 			it != null
-			it.comment != null && it.comment != "dont touch" && it.comment != "service"
+			it.comment != null && it.comment != "ExternalWG" && it.comment != "InteriorWG"
 		}.collect {
 			Map<String, String> it ->
-				String comment = it.get("comment")
 				Peer peer = new Peer()
 
 				peer.id = it.get(".id")
@@ -66,16 +65,8 @@ class MikroTikService extends MikroTikExecutor {
 				peer.lastHandshake = it.get("last-handshake")
 				peer.rx = it.get("rx")
 
-				String[] commentParts = comment.split("\n")
-				if (commentParts.length > 1) {
-					peer.privateKey = commentParts[commentParts.length - 1].replace(" ", "")
-					peer.name = commentParts.first()
-					peer.comment = commentParts.first() // TODO full swap to name
-				} else {
-					peer.privateKey = it.get('comment')
-					peer.name = it.get("name")
-					peer.comment = it.get("name") // TODO full swap to name
-				}
+				peer.privateKey = it.get('comment')
+				peer.name = it.get("name")
 
 				peer.currentEndpointPort = it.get("current-endpoint-port")
 				peer.currentEndpointAddress = it.get("current-endpoint-address")
@@ -128,19 +119,6 @@ class MikroTikService extends MikroTikExecutor {
 		})
 	}
 
-	Integer getNewIp() {
-		List<Integer> results = new ArrayList<>()
-		executeCommand("/interface/wireguard/peers/print").forEach {
-			String regex = "(?:\\d+\\.){3}(\\d{1,3})\\/\\d+"
-			Pattern pattern = Pattern.compile(regex)
-			Matcher matcher = pattern.matcher(it.get('allowed-address'))
-			if (matcher.find()) {
-				results.add(matcher.group(1).toInteger())
-			}
-		}
-		return results.max() + 1
-	}
-
 	MtInfo getMtInfo() {
 		MtInfo mtInfo = new MtInfo()
 		executeCommand('/system/routerboard/print').forEach {
@@ -154,7 +132,7 @@ class MikroTikService extends MikroTikExecutor {
 	void createNewPeer(String peerName) {
 		WireGuardKeyGen wireGuardKeyGen = new WireGuardKeyGen()
 		KeyPair keyPair = wireGuardKeyGen.keyPair()
-		String ip = "10.10.10.${getNewIp()}"
+		String ip = "10.10.10.${getHostNumber()}"
 		String peerQueryParams = "interface=${settings.localWgInterfaceName} comment=\"${keyPair.privateKey}\"" +
 				" public-key=\"${keyPair.publicKey}\" allowed-address=$ip/32" +
 				" persistent-keepalive='00:00:20' name=${peerName}"

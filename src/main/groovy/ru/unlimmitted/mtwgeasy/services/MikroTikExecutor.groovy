@@ -5,6 +5,9 @@ import me.legrange.mikrotik.ApiConnection
 import ru.unlimmitted.mtwgeasy.dto.MtSettings
 import ru.unlimmitted.mtwgeasy.dto.WgInterface
 
+import java.util.regex.Matcher
+import java.util.regex.Pattern
+
 class MikroTikExecutor {
 
 	ApiConnection connect
@@ -61,5 +64,18 @@ class MikroTikExecutor {
 				throw new RuntimeException("Failed to execute command: $command", e)
 			}
 		}
+	}
+
+	Integer getHostNumber() {
+		List<Integer> results = new ArrayList<>()
+		executeCommand("/interface/wireguard/peers/print").forEach {
+			String regex = "(?:\\d+\\.){3}(\\d{1,3})\\/\\d+"
+			Pattern pattern = Pattern.compile(regex)
+			Matcher matcher = pattern.matcher(it.get('allowed-address'))
+			if (matcher.find()) {
+				results.add(matcher.group(1).toInteger())
+			}
+		}
+		return results.size() > 0 ? results.max() + 1 : 1
 	}
 }
