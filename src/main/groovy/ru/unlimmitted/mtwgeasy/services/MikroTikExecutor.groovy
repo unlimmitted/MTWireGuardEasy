@@ -1,6 +1,5 @@
 package ru.unlimmitted.mtwgeasy.services
 
-import com.fasterxml.jackson.databind.ObjectMapper
 import me.legrange.mikrotik.ApiConnection
 import ru.unlimmitted.mtwgeasy.dto.MtSettings
 import ru.unlimmitted.mtwgeasy.dto.WgInterface
@@ -14,15 +13,21 @@ class MikroTikExecutor {
 	MtSettings settings
 	List<WgInterface> wgInterfaces
 
+	String mikrotikGateway = System.getenv("GATEWAY")
+
+	String mikrotikUser = System.getenv("MIKROTIK_USER")
+
+	String mikrotikPassword = System.getenv("MIKROTIK_PASSWORD")
+
 	MikroTikExecutor() {
 		initializeConnection()
 	}
 
 	void initializeConnection() {
 		try {
-			connect = ApiConnection.connect(System.getenv("GATEWAY"))
+			connect = ApiConnection.connect(mikrotikGateway)
 			connect.setTimeout(500)
-			connect.login(System.getenv("MIKROTIK_USER"), System.getenv("MIKROTIK_PASSWORD"))
+			connect.login(mikrotikUser, mikrotikPassword)
 			wgInterfaces = getInterfaces()
 		} catch (Exception e) {
 			throw new RuntimeException("Failed to connect to MikroTik", e)

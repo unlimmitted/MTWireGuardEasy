@@ -3,8 +3,8 @@ RUN apk add --no-cache git
 WORKDIR /usr/src/node
 RUN git clone https://github.com/unlimmitted/MTWireGuardEasy-frontend.git
 WORKDIR /usr/src/node/MTWireGuardEasy-frontend
-RUN yarn install
-RUN yarn build
+RUN npm install
+RUN npm run build
 
 FROM gradle:8.7.0-jdk21-alpine AS gradle
 COPY --chown=gradle:gradle . /home/gradle/

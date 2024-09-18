@@ -3,9 +3,6 @@ package ru.unlimmitted.mtwgeasy.services
 import com.fasterxml.jackson.databind.ObjectMapper
 import ru.unlimmitted.mtwgeasy.dto.MtSettings
 
-import java.util.regex.Matcher
-import java.util.regex.Pattern
-
 class RouterConfigurator extends MikroTikExecutor {
 
 	MtSettings routerSettings
@@ -90,7 +87,7 @@ class RouterConfigurator extends MikroTikExecutor {
 	void createPortForwardRule() {
 		String forwardQuery = "/ip/firewall/nat comment=\"WGMTEasyFWD\" action=dst-nat chain=dstnat protocol=udp " +
 				"dst-port=${routerSettings.localWgEndpointPort} in-interface=${routerSettings.wanInterfaceName} " +
-				"to-addresses=${System.getenv('GATEWAY')}"
+				"to-addresses=${mikrotikGateway}"
 		executeCommand(forwardQuery)
 		String masqueradeQuery = "/ip/firewall/nat comment=\"WGMTEasyFWD\" action=masquerade chain=srcnat " +
 				"out-interface=${routerSettings.externalWgInterfaceName}"

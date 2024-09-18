@@ -5,9 +5,6 @@ import me.legrange.mikrotik.ApiConnection
 import org.springframework.stereotype.Service
 import ru.unlimmitted.mtwgeasy.dto.*
 
-import java.util.regex.Matcher
-import java.util.regex.Pattern
-
 @Service
 class MikroTikService extends MikroTikExecutor {
 
