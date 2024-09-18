@@ -88,11 +88,11 @@ class RouterConfigurator extends MikroTikExecutor {
 	}
 
 	void createPortForwardRule() {
-		String forwardQuery = "/ip/firewall/nat comment=WGMTEasyFWD action=dst-nat chain=dstnat protocol=udp " +
+		String forwardQuery = "/ip/firewall/nat comment=\"WGMTEasyFWD\" action=dst-nat chain=dstnat protocol=udp " +
 				"dst-port=${routerSettings.localWgEndpointPort} in-interface=${routerSettings.wanInterfaceName} " +
 				"to-addresses=${System.getenv('GATEWAY')}"
 		executeCommand(forwardQuery)
-		String masqueradeQuery = "/ip/firewall/nat comment=WGMTEasyFWD action=masquerade chain=srcnat " +
+		String masqueradeQuery = "/ip/firewall/nat comment=\"WGMTEasyFWD\" action=masquerade chain=srcnat " +
 				"out-interface=${routerSettings.externalWgInterfaceName}"
 		executeCommand(masqueradeQuery)
 
