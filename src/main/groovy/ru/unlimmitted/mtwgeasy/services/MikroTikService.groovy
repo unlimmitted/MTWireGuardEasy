@@ -7,6 +7,8 @@ import org.whispersystems.curve25519.Curve25519
 import org.whispersystems.curve25519.Curve25519KeyPair
 import ru.unlimmitted.mtwgeasy.dto.*
 
+import java.util.regex.Matcher
+
 @Service
 class MikroTikService extends MikroTikExecutor {
 
@@ -132,8 +134,14 @@ class MikroTikService extends MikroTikExecutor {
 		Curve25519KeyPair keyPair = Curve25519.getInstance(Curve25519.JAVA).generateKeyPair()
 		String pub = Base64.getEncoder().encodeToString(keyPair.getPublicKey())
 		String pri = Base64.getEncoder().encodeToString(keyPair.getPrivateKey())
-		String ip = "10.10.10.${getHostNumber()}"
-		String peerQueryParams = "interface=\"${settings.localWgInterfaceName}\" comment=\"$pri\"" +
+		String regex = /^(\d{1,3})\.(\d{1,3})\.(\d{1,3})/
+		Matcher matcher = (settings.inputWgAddress =~ regex)
+		String networkAddress =''
+		if (matcher) {
+			networkAddress = matcher[0][1..3].join(".")
+		}
+		String ip = "$networkAddress.${getHostNumber()}"
+		String peerQueryParams = "interface=\"${settings.inputWgInterfaceName}\" comment=\"$pri\"" +
 				" public-key=\"$pub\" allowed-address=$ip/32 name=\"${peerName}\""
 		executeCommand("/interface/wireguard/peers/add $peerQueryParams")
 		String addressListQueryParam = "address=$ip list=${settings.toVpnAddressList} comment=$peerName"

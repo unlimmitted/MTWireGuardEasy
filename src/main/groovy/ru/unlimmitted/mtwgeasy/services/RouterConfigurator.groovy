@@ -21,8 +21,8 @@ class RouterConfigurator extends MikroTikExecutor {
 	}
 
 	private void createInterfaces() {
-		executeCommand("/interface/wireguard/add name=\"${routerSettings.localWgInterfaceName}\" mtu=1400 " +
-				"listen-port=${routerSettings.localWgEndpointPort}")
+		executeCommand("/interface/wireguard/add name=\"${routerSettings.inputWgInterfaceName}\" mtu=1400 " +
+				"listen-port=${routerSettings.inputWgEndpointPort}")
 		if (routerSettings.vpnChainMode) {
 			executeCommand("/interface/wireguard/add name=\"${routerSettings.externalWgInterfaceName}\" mtu=1400 " +
 					"listen-port=${routerSettings.endpointPort}")
@@ -31,8 +31,8 @@ class RouterConfigurator extends MikroTikExecutor {
 
 	private void createExternalPeer() {
 		String query = "/interface/wireguard/peers/add name=\"ExternalWG\" " +
-				"interface=\"${routerSettings.externalWgInterfaceName}\" public-key=\"${routerSettings.publicKey}\" " +
-				"preshared-key=\"${routerSettings.presharedKey}\" endpoint-address=${routerSettings.endpoint} " +
+				"interface=\"${routerSettings.externalWgInterfaceName}\" public-key=\"${routerSettings.externalWgPublicKey}\" " +
+				"preshared-key=\"${routerSettings.externalWgPresharedKey}\" endpoint-address=${routerSettings.endpoint} " +
 				"endpoint-port=${routerSettings.endpointPort} allowed-address=\"${routerSettings.allowedAddress}\" " +
 				"persistent-keepalive=20"
 		executeCommand(query)
@@ -41,12 +41,12 @@ class RouterConfigurator extends MikroTikExecutor {
 	private void createInteriorPeer() {
 		Curve25519KeyPair keyPair = Curve25519.getInstance(Curve25519.JAVA).generateKeyPair()
 		String pub = Base64.getEncoder().encodeToString(keyPair.getPublicKey())
-		String address = routerSettings.localWgNetwork.replace(
-				routerSettings.localWgNetwork.split("\\.").last(),
-				getHostNumber() + "/${routerSettings.localWgNetwork.split("\\.").last().split("/").last()}"
+		String address = routerSettings.inputWgAddress.replace(
+				routerSettings.inputWgAddress.split("\\.").last(),
+				getHostNumber() + "/${routerSettings.inputWgAddress.split("\\.").last().split("/").last()}"
 		)
 
-		String query = "/interface/wireguard/peers/add interface=\"${routerSettings.localWgInterfaceName}\" " +
+		String query = "/interface/wireguard/peers/add interface=\"${routerSettings.inputWgInterfaceName}\" " +
 				"public-key=\"${pub}\" allowed-address=${address} " +
 				"name=\"InteriorWG\" persistent-keepalive=20"
 		executeCommand(query)
@@ -58,19 +58,19 @@ class RouterConfigurator extends MikroTikExecutor {
 
 	private void createIpRule() {
 		executeCommand(
-				"/ip/address/add address=${routerSettings.localWgNetwork.split("/").first()}/24 " +
-						"interface=${routerSettings.localWgInterfaceName}"
+				"/ip/address/add address=${routerSettings.inputWgAddress.split("/").first()}/24 " +
+						"interface=${routerSettings.inputWgInterfaceName}"
 		)
 		if (routerSettings.vpnChainMode) {
 			executeCommand(
 					"/ip/address/add address=${routerSettings.ipAddress.split("/").first()}/24 " +
-							"interface=${routerSettings.localWgInterfaceName}"
+							"interface=${routerSettings.inputWgInterfaceName}"
 			)
 
-			String address = routerSettings.localWgNetwork.split("/").first() + "/24"
+			String address = routerSettings.inputWgAddress.split("/").first() + "/24"
 			String mangleQuery = "/ip/firewall/mangle/add action=mark-routing chain=prerouting src-address=${address} " +
 					"dst-address=!${address} src-address-list=\"${routerSettings.toVpnAddressList}\" " +
-					"in-interface=\"${routerSettings.localWgInterfaceName}\" " +
+					"in-interface=\"${routerSettings.inputWgInterfaceName}\" " +
 					"new-routing-mark=\"${routerSettings.toVpnTableName}\" passthrough=yes"
 			executeCommand(mangleQuery)
 
@@ -89,7 +89,7 @@ class RouterConfigurator extends MikroTikExecutor {
 
 	void createPortForwardRule() {
 		String forwardQuery = "/ip/firewall/nat comment=\"WGMTEasyFWD\" action=dst-nat chain=dstnat protocol=udp " +
-				"dst-port=${routerSettings.localWgEndpointPort} in-interface=${routerSettings.wanInterfaceName} " +
+				"dst-port=${routerSettings.inputWgEndpointPort} in-interface=${routerSettings.wanInterfaceName} " +
 				"to-addresses=${mikrotikGateway}"
 		executeCommand(forwardQuery)
 		String masqueradeQuery = "/ip/firewall/nat comment=\"WGMTEasyFWD\" action=masquerade chain=srcnat " +

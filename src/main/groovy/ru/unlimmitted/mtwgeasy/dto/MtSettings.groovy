@@ -1,21 +1,21 @@
 package ru.unlimmitted.mtwgeasy.dto
 
 class MtSettings {
-	String localWgInterfaceName = "WGMTEasyIn"
+	String inputWgInterfaceName = "WGMTEasyIn"
 	String externalWgInterfaceName = "WGMTEasyOut"
 	String toVpnAddressList = "WGMTEasyToVpnAddresses"
 	String toVpnTableName = "WGMTEasyToVpnTable"
-	String localWgNetwork
-	String localWgEndpoint
-	String localWgEndpointPort
+	String inputWgAddress
+	String inputWgEndpoint
+	String inputWgEndpointPort
 	String localNetwork
 	String ipAddress
 	String allowedAddress
 	String endpoint
 	String endpointPort
-	String publicKey
-	String privateKey
+	String externalWgPublicKey
+	String externalWgPrivateKey
 	String wanInterfaceName
-	String presharedKey
+	String externalWgPresharedKey
 	Boolean vpnChainMode
 }
