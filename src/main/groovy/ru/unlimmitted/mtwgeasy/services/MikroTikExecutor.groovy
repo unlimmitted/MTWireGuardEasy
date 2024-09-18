@@ -69,9 +69,9 @@ class MikroTikExecutor {
 		} catch (Exception e) {
 			if (e.message.contains("timed out")) {
 				reconnect()
-				return connect.execute(command)
+				return executeCommand(command)
 			} else {
-				throw new RuntimeException("Failed to execute command: $command", e)
+				throw new RuntimeException("Failed to execute command: $command: ${e.message}", e)
 			}
 		}
 	}

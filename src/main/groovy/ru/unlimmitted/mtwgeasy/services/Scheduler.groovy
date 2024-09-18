@@ -16,12 +16,17 @@ class Scheduler {
 	WebSocketService webSocketService
 
 	@Scheduled(fixedDelay = 15, timeUnit = TimeUnit.SECONDS)
-	void sendInterfaces () {
+	void sendInterfaces() {
 		webSocketService.sendInterfaces(mikroTikService.getMtInfo())
 	}
 
 	@Scheduled(fixedDelay = 1, timeUnit = TimeUnit.MINUTES)
 	void sendPeers() {
 		webSocketService.sendPeers(mikroTikService.getPeers())
+	}
+
+	@Scheduled(fixedDelay = 1, timeUnit = TimeUnit.MINUTES)
+	void saveInterfaceTraffic() {
+		mikroTikService.saveInterfaceTraffic()
 	}
 }
