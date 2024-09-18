@@ -80,10 +80,22 @@ class RouterConfigurator extends MikroTikExecutor {
 			executeCommand(routesQuery)
 		}
 	}
+
 	void saveSettings() {
 		ObjectMapper mapper = new ObjectMapper()
 		String res = mapper.writeValueAsString(routerSettings).replace("\"", "\\\"")
 		executeCommand("/file/add name=\"WGMTSettings.conf\" contents='${res}'")
+	}
+
+	void createPortForwardRule() {
+		String forwardQuery = "/ip/firewall/nat comment=WGMTEasyFWD action=dst-nat chain=dstnat protocol=udp " +
+				"dst-port=${routerSettings.localWgEndpointPort} in-interface=${routerSettings.wanInterfaceName} " +
+				"to-addresses=${System.getenv('GATEWAY')}"
+		executeCommand(forwardQuery)
+		String masqueradeQuery = "/ip/firewall/nat comment=WGMTEasyFWD action=masquerade chain=srcnat " +
+				"out-interface=${routerSettings.externalWgInterfaceName}"
+		executeCommand(masqueradeQuery)
+
 	}
 
 	void run() {
@@ -96,5 +108,6 @@ class RouterConfigurator extends MikroTikExecutor {
 		createRoutingTable()
 		createIpRule()
 		saveSettings()
+		createPortForwardRule()
 	}
 }
