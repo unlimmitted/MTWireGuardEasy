@@ -36,6 +36,8 @@ dependencies {
 	implementation 'org.springframework.boot:spring-boot-starter-thymeleaf'
 
 	implementation 'org.springframework.boot:spring-boot-starter-security'
+
+	implementation group: 'org.whispersystems', name: 'curve25519-java', version: '0.5.0'
 }
 
 tasks.named('test') {

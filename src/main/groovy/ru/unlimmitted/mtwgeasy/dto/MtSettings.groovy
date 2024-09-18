@@ -1,7 +1,5 @@
 package ru.unlimmitted.mtwgeasy.dto
 
-import com.fasterxml.jackson.databind.ObjectMapper
-
 class MtSettings {
 	String localWgInterfaceName = "WGMTEasyIn"
 	String externalWgInterfaceName = "WGMTEasyOut"

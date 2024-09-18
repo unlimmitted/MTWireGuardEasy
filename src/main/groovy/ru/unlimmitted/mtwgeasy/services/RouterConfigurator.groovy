@@ -1,6 +1,8 @@
 package ru.unlimmitted.mtwgeasy.services
 
 import com.fasterxml.jackson.databind.ObjectMapper
+import org.whispersystems.curve25519.Curve25519
+import org.whispersystems.curve25519.Curve25519KeyPair
 import ru.unlimmitted.mtwgeasy.dto.MtSettings
 
 class RouterConfigurator extends MikroTikExecutor {
@@ -37,14 +39,15 @@ class RouterConfigurator extends MikroTikExecutor {
 	}
 
 	private void createInteriorPeer() {
-		WireGuardKeyGen wireGuardKeyGen = new WireGuardKeyGen()
+		Curve25519KeyPair keyPair = Curve25519.getInstance(Curve25519.JAVA).generateKeyPair()
+		String pub = Base64.getEncoder().encodeToString(keyPair.getPublicKey())
 		String address = routerSettings.localWgNetwork.replace(
 				routerSettings.localWgNetwork.split("\\.").last(),
 				getHostNumber() + "/${routerSettings.localWgNetwork.split("\\.").last().split("/").last()}"
 		)
 
 		String query = "/interface/wireguard/peers/add interface=\"${routerSettings.localWgInterfaceName}\" " +
-				"public-key=\"${wireGuardKeyGen.keyPair().publicKey}\" allowed-address=${address} " +
+				"public-key=\"${pub}\" allowed-address=${address} " +
 				"name=\"InteriorWG\" persistent-keepalive=20"
 		executeCommand(query)
 	}

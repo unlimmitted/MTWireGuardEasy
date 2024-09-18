@@ -3,6 +3,8 @@ package ru.unlimmitted.mtwgeasy.services
 import com.fasterxml.jackson.databind.ObjectMapper
 import me.legrange.mikrotik.ApiConnection
 import org.springframework.stereotype.Service
+import org.whispersystems.curve25519.Curve25519
+import org.whispersystems.curve25519.Curve25519KeyPair
 import ru.unlimmitted.mtwgeasy.dto.*
 
 @Service
@@ -127,12 +129,12 @@ class MikroTikService extends MikroTikExecutor {
 	}
 
 	void createNewPeer(String peerName) {
-		WireGuardKeyGen wireGuardKeyGen = new WireGuardKeyGen()
-		KeyPair keyPair = wireGuardKeyGen.keyPair()
+		Curve25519KeyPair keyPair = Curve25519.getInstance(Curve25519.JAVA).generateKeyPair()
+		String pub = Base64.getEncoder().encodeToString(keyPair.getPublicKey())
+		String pri = Base64.getEncoder().encodeToString(keyPair.getPrivateKey())
 		String ip = "10.10.10.${getHostNumber()}"
-		String peerQueryParams = "interface=${settings.localWgInterfaceName} comment=\"${keyPair.privateKey}\"" +
-				" public-key=\"${keyPair.publicKey}\" allowed-address=$ip/32" +
-				" persistent-keepalive='00:00:20' name=${peerName}"
+		String peerQueryParams = "interface=\"${settings.localWgInterfaceName}\" comment=\"$pri\"" +
+				" public-key=\"$pub\" allowed-address=$ip/32 name=\"${peerName}\""
 		executeCommand("/interface/wireguard/peers/add $peerQueryParams")
 		String addressListQueryParam = "address=$ip list=${settings.toVpnAddressList} comment=$peerName"
 		executeCommand("/ip/firewall/address-list/add $addressListQueryParam")
