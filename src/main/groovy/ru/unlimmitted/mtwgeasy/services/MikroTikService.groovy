@@ -55,7 +55,7 @@ class MikroTikService extends MikroTikExecutor {
 
 		List<Peer> peers = executeCommand("/interface/wireguard/peers/print").findAll {
 			it != null
-			it.comment != null && it.comment != "ExternalWG" && it.comment != "InteriorWG"
+			!it.get("private-key").isEmpty() && it.comment != "ExternalWG" && it.comment != "InteriorWG"
 		}.collect {
 			Map<String, String> it ->
 				Peer peer = new Peer()
@@ -66,7 +66,7 @@ class MikroTikService extends MikroTikExecutor {
 				peer.lastHandshake = it.get("last-handshake")
 				peer.rx = it.get("rx")
 
-				peer.privateKey = it.get('comment')
+				peer.privateKey = it.get('private-key')
 				peer.name = it.get("name")
 
 				peer.currentEndpointPort = it.get("current-endpoint-port")
@@ -132,18 +132,19 @@ class MikroTikService extends MikroTikExecutor {
 
 	void createNewPeer(String peerName) {
 		Curve25519KeyPair keyPair = Curve25519.getInstance(Curve25519.JAVA).generateKeyPair()
-		String pub = Base64.getEncoder().encodeToString(keyPair.getPublicKey())
 		String pri = Base64.getEncoder().encodeToString(keyPair.getPrivateKey())
 		String regex = /^(\d{1,3})\.(\d{1,3})\.(\d{1,3})/
 		Matcher matcher = (settings.inputWgAddress =~ regex)
-		String networkAddress =''
-		if (matcher) {
-			networkAddress = matcher[0][1..3].join(".")
-		}
-		String ip = "$networkAddress.${getHostNumber()}"
-		String peerQueryParams = "interface=\"${settings.inputWgInterfaceName}\" comment=\"$pri\"" +
-				" public-key=\"$pub\" allowed-address=$ip/32 name=\"${peerName}\""
-		executeCommand("/interface/wireguard/peers/add $peerQueryParams")
+		String ip = "${matcher[0][1..3].join(".")}.${getHostNumber()}"
+		String peerQueryParams = """
+			|/interface/wireguard/peers/add
+			|interface="${settings.inputWgInterfaceName}"
+			|private-key="$pri"
+			|allowed-address=$ip/32
+			|name="${peerName}"
+			""".stripMargin().replace("\n", " ")
+
+		executeCommand("$peerQueryParams")
 		String addressListQueryParam = "address=$ip list=${settings.toVpnAddressList} comment=$peerName"
 		executeCommand("/ip/firewall/address-list/add $addressListQueryParam")
 	}

@@ -4,6 +4,8 @@ import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.scheduling.annotation.Scheduled
 import org.springframework.stereotype.Service
 
+import java.util.concurrent.TimeUnit
+
 @Service
 class Scheduler {
 
@@ -13,12 +15,12 @@ class Scheduler {
 	@Autowired
 	WebSocketService webSocketService
 
-	@Scheduled(cron = '*/15 * * * * *')
+	@Scheduled(fixedDelay = 15, timeUnit = TimeUnit.SECONDS)
 	void sendInterfaces () {
 		webSocketService.sendInterfaces(mikroTikService.getMtInfo())
 	}
 
-	@Scheduled(cron = '0 */1 * * * *')
+	@Scheduled(fixedDelay = 1, timeUnit = TimeUnit.MINUTES)
 	void sendPeers() {
 		webSocketService.sendPeers(mikroTikService.getPeers())
 	}
