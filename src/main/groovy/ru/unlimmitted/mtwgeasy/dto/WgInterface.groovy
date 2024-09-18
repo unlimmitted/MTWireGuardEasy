@@ -8,4 +8,6 @@ class WgInterface {
 	Boolean disabled
 	String listenPort
 	String mtu
+	String rxByte
+	String txByte
 }
