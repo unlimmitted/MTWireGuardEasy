@@ -10,7 +10,7 @@ docker build --tag mtwgeasy .
 ```
 
 ```cpp
-docker run --name MTWGEasy -d -p 8080:8080 -e GATEWAY=<you-mikrotik-ip> -e MIKROTIK_USER=<you-mikrotik-admin-login> -e MIKROTIK_PASSWORD=<you-mikrotik-pass> mtwgeasy
+docker run --name MTWGEasy -d --no-cache -p 8080:8080 -e GATEWAY=<you-mikrotik-ip> -e MIKROTIK_USER=<you-mikrotik-admin-login> -e MIKROTIK_PASSWORD=<you-mikrotik-pass> mtwgeasy
 ```
 
 ![main](https://github.com/user-attachments/assets/d48084ba-789b-4e79-95a7-631bc4d40fab)
