@@ -7,7 +7,7 @@ import ru.unlimmitted.mtwgeasy.dto.MtSettings
 
 class RouterConfigurator extends MikroTikExecutor {
 
-	MtSettings routerSettings
+	private final MtSettings routerSettings
 
 	RouterConfigurator(MtSettings routerSettings) {
 		super()
@@ -21,34 +21,50 @@ class RouterConfigurator extends MikroTikExecutor {
 	}
 
 	private void createInterfaces() {
-		executeCommand("/interface/wireguard/add name=\"${routerSettings.inputWgInterfaceName}\" mtu=1400 " +
-				"listen-port=${routerSettings.inputWgEndpointPort}")
+		String query = """
+				|/interface/wireguard/add
+				|name="${routerSettings.inputWgInterfaceName}" 
+				|mtu=1400
+				|listen-port=${routerSettings.inputWgEndpointPort}
+				""".stripMargin().replace("\n", " ")
+		executeCommand(query)
 		if (routerSettings.vpnChainMode) {
-			executeCommand("/interface/wireguard/add name=\"${routerSettings.externalWgInterfaceName}\" mtu=1400 " +
-					"listen-port=${routerSettings.endpointPort}")
+			query = """
+					|/interface/wireguard/add name="${routerSettings.externalWgInterfaceName}" 
+					|mtu=1400
+					|listen-port=${routerSettings.endpointPort}
+					""".stripMargin().replace("\n", " ")
+			executeCommand(query)
 		}
 	}
 
 	private void createExternalPeer() {
-		String query = "/interface/wireguard/peers/add name=\"ExternalWG\" " +
-				"interface=\"${routerSettings.externalWgInterfaceName}\" public-key=\"${routerSettings.externalWgPublicKey}\" " +
-				"preshared-key=\"${routerSettings.externalWgPresharedKey}\" endpoint-address=${routerSettings.endpoint} " +
-				"endpoint-port=${routerSettings.endpointPort} allowed-address=\"${routerSettings.allowedAddress}\" " +
-				"persistent-keepalive=20"
+		String query = """
+				|/interface/wireguard/peers/add name="ExternalWG"
+				|interface="${routerSettings.externalWgInterfaceName}"
+				|public-key="${routerSettings.externalWgPublicKey}
+				|preshared-key="${routerSettings.externalWgPresharedKey}" 
+				|endpoint-address=${routerSettings.endpoint}
+				|endpoint-port=${routerSettings.endpointPort} allowed-address="${routerSettings.allowedAddress}"
+				|persistent-keepalive=20
+				""".stripMargin().replace("\n", " ")
 		executeCommand(query)
 	}
 
 	private void createInteriorPeer() {
 		Curve25519KeyPair keyPair = Curve25519.getInstance(Curve25519.JAVA).generateKeyPair()
-		String pub = Base64.getEncoder().encodeToString(keyPair.getPublicKey())
-		String address = routerSettings.inputWgAddress.replace(
-				routerSettings.inputWgAddress.split("\\.").last(),
-				getHostNumber() + "/${routerSettings.inputWgAddress.split("\\.").last().split("/").last()}"
-		)
-
-		String query = "/interface/wireguard/peers/add interface=\"${routerSettings.inputWgInterfaceName}\" " +
-				"public-key=\"${pub}\" allowed-address=${address} " +
-				"name=\"InteriorWG\" persistent-keepalive=20"
+		String pubKey = Base64.getEncoder().encodeToString(keyPair.getPublicKey())
+		String ipAddress = routerSettings.inputWgAddress.split("\\.").last()
+		String mask = ipAddress.split("/").last()
+		String address = routerSettings.inputWgAddress.replace(ipAddress, "${getHostNumber()}/${mask}")
+		String query = """
+				|/interface/wireguard/peers/add 
+				|interface="${routerSettings.inputWgInterfaceName}"
+				|public-key="${pubKey}" 
+				|allowed-address=${address}
+				|name="InteriorWG"
+				|persistent-keepalive=20
+				""".stripMargin().replace("\n", " ")
 		executeCommand(query)
 	}
 
@@ -57,45 +73,75 @@ class RouterConfigurator extends MikroTikExecutor {
 	}
 
 	private void createIpRule() {
-		executeCommand(
-				"/ip/address/add address=${routerSettings.inputWgAddress.split("/").first()}/24 " +
-						"interface=${routerSettings.inputWgInterfaceName}"
-		)
+		String wgAddress = routerSettings.inputWgAddress.split("/").first()
+		def query = """
+				|/ip/address/add
+				|address=${wgAddress}/24
+				|interface=${routerSettings.inputWgInterfaceName}
+				""".stripMargin().replace("\n", " ")
+		executeCommand(query)
 		if (routerSettings.vpnChainMode) {
-			executeCommand(
-					"/ip/address/add address=${routerSettings.ipAddress.split("/").first()}/24 " +
-							"interface=${routerSettings.inputWgInterfaceName}"
-			)
+			query = """
+					|/ip/address/add
+					|address=${routerSettings.ipAddress.split("/").first()}/24
+					|interface=${routerSettings.inputWgInterfaceName}
+					""".stripMargin().replace("\n", " ")
+			executeCommand(query)
 
-			String address = routerSettings.inputWgAddress.split("/").first() + "/24"
-			String mangleQuery = "/ip/firewall/mangle/add action=mark-routing chain=prerouting src-address=${address} " +
-					"dst-address=!${address} src-address-list=\"${routerSettings.toVpnAddressList}\" " +
-					"in-interface=\"${routerSettings.inputWgInterfaceName}\" " +
-					"new-routing-mark=\"${routerSettings.toVpnTableName}\" passthrough=yes"
+			wgAddress += "/24"
+			String mangleQuery = """
+					|/ip/firewall/mangle/add
+					|action=mark-routing 
+					|chain=prerouting 
+					|src-address=${wgAddress}
+					|dst-address=!${wgAddress} 
+					|src-address-list="${routerSettings.toVpnAddressList}"
+					|in-interface="${routerSettings.inputWgInterfaceName}"
+					|new-routing-mark="${routerSettings.toVpnTableName}"
+					|passthrough=yes
+			""".stripMargin().replace("\n", " ")
 			executeCommand(mangleQuery)
 
-			String routesQuery = "/ip/route/add distance=1 dst-address=0.0.0.0/0 " +
-					"gateway=${routerSettings.externalWgInterfaceName} " +
-					"routing-table=${routerSettings.toVpnTableName} scope=30 suppress-hw-offload=no target-scope=10"
+			String routesQuery = """
+					|/ip/route/add
+					|distance=1
+					|dst-address=0.0.0.0/0
+					|gateway=${routerSettings.externalWgInterfaceName}
+					|routing-table=${routerSettings.toVpnTableName}
+					|scope=30
+					|suppress-hw-offload=no
+					|target-scope=10
+					""".stripMargin().replace("\n", " ")
 			executeCommand(routesQuery)
 		}
 	}
 
-	void saveSettings() {
+	private void saveSettings() {
 		ObjectMapper mapper = new ObjectMapper()
 		String res = mapper.writeValueAsString(routerSettings).replace("\"", "\\\"")
 		executeCommand("/file/add name=\"WGMTSettings.conf\" contents='${res}'")
 	}
 
-	void createPortForwardRule() {
-		String forwardQuery = "/ip/firewall/nat comment=\"WGMTEasyFWD\" action=dst-nat chain=dstnat protocol=udp " +
-				"dst-port=${routerSettings.inputWgEndpointPort} in-interface=${routerSettings.wanInterfaceName} " +
-				"to-addresses=${mikrotikGateway}"
+	private void createPortForwardRule() {
+		String forwardQuery = """
+				|/ip/firewall/nat
+				|comment="WGMTEasyFWD"
+				|action=dst-nat
+				|chain=dstnat
+				|protocol=udp
+				|dst-port=${routerSettings.inputWgEndpointPort}
+				|in-interface=${routerSettings.wanInterfaceName}
+				|to-addresses=${mikrotikGateway}
+		""".stripMargin().replace("\n", " ")
 		executeCommand(forwardQuery)
-		String masqueradeQuery = "/ip/firewall/nat comment=\"WGMTEasyFWD\" action=masquerade chain=srcnat " +
-				"out-interface=${routerSettings.externalWgInterfaceName}"
+		String masqueradeQuery = """
+				|/ip/firewall/nat
+				|comment="WGMTEasyFWD"
+				|action=masquerade
+				|chain=srcnat
+				|out-interface=${routerSettings.externalWgInterfaceName}
+		""".stripMargin().replace("\n", " ")
 		executeCommand(masqueradeQuery)
-
 	}
 
 	void run() {
