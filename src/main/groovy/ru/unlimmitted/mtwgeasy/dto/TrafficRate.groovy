@@ -38,7 +38,7 @@ class TrafficRate {
 		}
 
 		TrafficRate build() {
-			return new TrafficRate(tx, rx, time)
+			return new TrafficRate(tx, rx, Instant.ofEpochSecond(time))
 		}
 	}
 

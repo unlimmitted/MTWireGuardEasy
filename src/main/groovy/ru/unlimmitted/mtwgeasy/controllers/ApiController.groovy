@@ -56,4 +56,9 @@ class ApiController {
 		mikroTikService.runConfigurator(settings)
 		return ResponseEntity.ok().body(mikroTikService.getPeers())
 	}
+
+	@GetMapping("/get-traffic-by-minutes")
+	ResponseEntity<Object> getTrafficByMinutes() {
+		return ResponseEntity.ok().body(mikroTikService.getTrafficByMinutes())
+	}
 }

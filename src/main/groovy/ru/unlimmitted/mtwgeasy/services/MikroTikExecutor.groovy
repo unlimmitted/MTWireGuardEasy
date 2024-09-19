@@ -23,7 +23,7 @@ class MikroTikExecutor {
 		initializeConnection()
 	}
 
-	void initializeConnection() {
+	private void initializeConnection() {
 		try {
 			connect = ApiConnection.connect(mikrotikGateway)
 			connect.setTimeout(700)
@@ -34,9 +34,8 @@ class MikroTikExecutor {
 		}
 	}
 
-	List<WgInterface> getInterfaces() {
-		List<WgInterface> wgInterfaces = new ArrayList<>()
-		executeCommand('/interface/wireguard/print').forEach {
+	private List<WgInterface> getInterfaces() {
+		return executeCommand('/interface/wireguard/print').collect {
 			WgInterface wgInterface = new WgInterface()
 			wgInterface.name = it.get('name')
 			wgInterface.running = it.get('running').toBoolean()
@@ -45,17 +44,14 @@ class MikroTikExecutor {
 			wgInterface.disabled = it.get('disabled').toBoolean()
 			wgInterface.listenPort = it.get('listen-port')
 			wgInterface.mtu = it.get('mtu')
-			wgInterfaces.add(wgInterface)
+			Map<String, String> intStats = executeCommand("/interface/print stats where name=${wgInterface.name}").first()
+			wgInterface.rxByte = intStats.get("rx-byte")
+			wgInterface.txByte = intStats.get("tx-byte")
+			return wgInterface
 		}
-		wgInterfaces.forEach {
-			Map<String, String> intStats = executeCommand("/interface/print stats where name=${it.name}").first()
-			it.rxByte = intStats.get("rx-byte")
-			it.txByte = intStats.get("tx-byte")
-		}
-		return wgInterfaces
 	}
 
-	void reconnect() {
+	private void reconnect() {
 		try {
 			initializeConnection()
 		} catch (Exception e) {
