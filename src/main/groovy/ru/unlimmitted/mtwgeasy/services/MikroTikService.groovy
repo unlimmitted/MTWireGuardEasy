@@ -7,14 +7,19 @@ import org.whispersystems.curve25519.Curve25519
 import org.whispersystems.curve25519.Curve25519KeyPair
 import ru.unlimmitted.mtwgeasy.dto.*
 
+import java.time.Instant
+import java.time.temporal.ChronoUnit
 import java.util.regex.Matcher
+import java.util.stream.LongStream
 
 @Service
 class MikroTikService extends MikroTikExecutor {
 
-	ApiConnection connect
-	MtSettings settings
-	List<WgInterface> wgInterfaces
+	private ApiConnection connect
+	private MtSettings settings
+	private List<WgInterface> wgInterfaces
+
+	private static final String trafficRateFileName = "traffic_rate.txt"
 
 	MikroTikService() {
 		super()
@@ -23,7 +28,7 @@ class MikroTikService extends MikroTikExecutor {
 		settings = readSettings()
 	}
 
-	MtSettings readSettings() {
+	private MtSettings readSettings() {
 		ObjectMapper objectMapper = new ObjectMapper()
 		if (isSettings()) {
 			return objectMapper.readValue(
@@ -39,10 +44,7 @@ class MikroTikService extends MikroTikExecutor {
 	}
 
 	Boolean isSettings() {
-		Map<String, String> result = executeCommand('/file/print').find {
-			it.name == 'WGMTSettings.conf'
-		}
-		return result
+		return executeCommand('/file/print').find { it.name == 'WGMTSettings.conf' }
 	}
 
 	static void runConfigurator(MtSettings settings) {
@@ -162,6 +164,48 @@ class MikroTikService extends MikroTikExecutor {
 		String addressListId = findPeerInAddressList(lists, peer.allowedAddress.split('/').first()).id
 		executeCommand("/interface/wireguard/peers/remove numbers=$peerId")
 		executeCommand("/ip/firewall/address-list/remove numbers=$addressListId")
+	}
+
+	void saveInterfaceTraffic() {
+		String json = executeCommand('/file/print')
+				.find { it.name == trafficRateFileName }?.contents
+				?: "[]"
+		if (json != "[]") {
+			initializeConnection()
+			Integer number = executeCommand("/file/print")
+					.indexed()
+					.find { index, it -> it.name == trafficRateFileName }
+					.key
+			executeCommand("/file/remove numbers=$number")
+		}
+		Long sumOfTx = getMtInfo().interfaces.sum { it.txByte.toLong() } as Long
+		Long sumOfRx = getMtInfo().interfaces.sum { it.rxByte.toLong() } as Long
+		TrafficRate rate = new TrafficRate(sumOfTx, sumOfRx, Instant.now())
+		ObjectMapper mapper = new ObjectMapper()
+		List<TrafficRate> rates = (mapper.readValue(json, mapper.getTypeFactory().constructCollectionType(List.class, TrafficRate.class)) as List<TrafficRate>)
+				.findAll {
+					Instant.ofEpochSecond(it.time) > Instant.now().minus(1, ChronoUnit.HOURS)
+				}
+		rates.add(rate)
+		json = mapper.writeValueAsString(rates)
+		executeCommand("/file/add name=\"${trafficRateFileName}\" contents='${json}'")
+	}
+
+	List<TrafficRate> getTrafficByMinutes() {
+		def json = executeCommand('/file/print')
+				.find { it.name == trafficRateFileName }
+				?.contents
+		ObjectMapper mapper = new ObjectMapper()
+		List<TrafficRate> rates = mapper.readValue(json, mapper.getTypeFactory().constructCollectionType(List.class, TrafficRate.class))
+		return LongStream.range(1, rates.size())
+				.mapToObj { i ->
+					new TrafficRate(
+							(rates[i].tx - rates[i - 1].tx) / 1_048_576 as Long,
+							(rates[i].rx - rates[i - 1].rx) / 1_048_576 as Long,
+							Instant.ofEpochSecond(rates[i].time)
+					)
+				}
+				.toList()
 	}
 
 }
