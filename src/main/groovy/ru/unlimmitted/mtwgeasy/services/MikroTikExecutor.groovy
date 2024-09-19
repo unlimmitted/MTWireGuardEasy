@@ -23,7 +23,7 @@ class MikroTikExecutor {
 		initializeConnection()
 	}
 
-	private void initializeConnection() {
+	protected void initializeConnection() {
 		try {
 			connect = ApiConnection.connect(mikrotikGateway)
 			connect.setTimeout(700)
@@ -55,7 +55,7 @@ class MikroTikExecutor {
 		try {
 			initializeConnection()
 		} catch (Exception e) {
-			throw new RuntimeException("Reconnection failed", e)
+			throw new RuntimeException("Reconnection failed: ${e.message}", e)
 		}
 	}
 

@@ -171,6 +171,7 @@ class MikroTikService extends MikroTikExecutor {
 				.find { it.name == trafficRateFileName }?.contents
 				?: "[]"
 		if (json != "[]") {
+			initializeConnection()
 			Integer number = executeCommand("/file/print")
 					.indexed()
 					.find { index, it -> it.name == trafficRateFileName }
