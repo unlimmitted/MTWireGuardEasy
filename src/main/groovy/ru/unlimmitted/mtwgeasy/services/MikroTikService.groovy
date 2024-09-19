@@ -25,26 +25,6 @@ class MikroTikService extends MikroTikExecutor {
 		super()
 		connect = super.connect
 		wgInterfaces = super.wgInterfaces
-		settings = readSettings()
-	}
-
-	private MtSettings readSettings() {
-		ObjectMapper objectMapper = new ObjectMapper()
-		if (isSettings()) {
-			return objectMapper.readValue(
-					executeCommand('/file/print').find {
-						it.name == 'WGMTSettings.conf'
-					}.contents.replace("\\\"", "\""),
-					MtSettings.class
-			)
-		} else {
-			MtSettings mtSettings = new MtSettings()
-			return mtSettings
-		}
-	}
-
-	Boolean isSettings() {
-		return executeCommand('/file/print').find { it.name == 'WGMTSettings.conf' }
 	}
 
 	static void runConfigurator(MtSettings settings) {
@@ -77,10 +57,10 @@ class MikroTikService extends MikroTikExecutor {
 				peer.peerInterface = it.get("interface")
 				peer.presharedKey = it.get("preshared-key")
 
-				peer.endpoint = settings.getEndpoint()
+				peer.endpoint = settings.endpoint
 				WgInterface wgInterface = findInterface(it.get("interface"))
 				if (wgInterface != null) {
-					peer.endpointPort = wgInterface.getListenPort()
+					peer.endpointPort = wgInterface.listenPort
 				}
 
 				String[] allowedAddressParts = it.get("allowed-address").split("/")

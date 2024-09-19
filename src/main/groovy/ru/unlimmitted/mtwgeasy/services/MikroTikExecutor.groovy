@@ -1,5 +1,6 @@
 package ru.unlimmitted.mtwgeasy.services
 
+import com.fasterxml.jackson.databind.ObjectMapper
 import me.legrange.mikrotik.ApiConnection
 import ru.unlimmitted.mtwgeasy.dto.MtSettings
 import ru.unlimmitted.mtwgeasy.dto.WgInterface
@@ -26,12 +27,31 @@ class MikroTikExecutor {
 	protected void initializeConnection() {
 		try {
 			connect = ApiConnection.connect(mikrotikGateway)
-			connect.setTimeout(700)
 			connect.login(mikrotikUser, mikrotikPassword)
 			wgInterfaces = getInterfaces()
+			settings = readSettings()
 		} catch (Exception e) {
 			throw new RuntimeException("Failed to connect to MikroTik", e)
 		}
+	}
+
+	private MtSettings readSettings() {
+		ObjectMapper objectMapper = new ObjectMapper()
+		if (isSettings()) {
+			return objectMapper.readValue(
+					executeCommand('/file/print').find {
+						it.name == 'WGMTSettings.conf'
+					}.contents.replace("\\\"", "\""),
+					MtSettings.class
+			)
+		} else {
+			MtSettings mtSettings = new MtSettings()
+			return mtSettings
+		}
+	}
+
+	Boolean isSettings() {
+		return executeCommand('/file/print').find { it.name == 'WGMTSettings.conf' }
 	}
 
 	private List<WgInterface> getInterfaces() {
