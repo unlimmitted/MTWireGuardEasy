@@ -15,18 +15,23 @@ class Scheduler {
 	@Autowired
 	WebSocketService webSocketService
 
-	@Scheduled(fixedDelay = 15, timeUnit = TimeUnit.SECONDS)
+	@Scheduled(cron = "0 * * * * *")
 	void sendInterfaces() {
 		webSocketService.sendInterfaces(mikroTikService.getMtInfo())
 	}
 
-	@Scheduled(fixedDelay = 1, timeUnit = TimeUnit.MINUTES)
+	@Scheduled(cron = "*/15 * * * * *")
 	void sendPeers() {
 		webSocketService.sendPeers(mikroTikService.getPeers())
 	}
 
-	@Scheduled(fixedDelay = 1, timeUnit = TimeUnit.MINUTES)
+	@Scheduled(cron = "0 * * * * *")
 	void saveInterfaceTraffic() {
 		mikroTikService.saveInterfaceTraffic()
+	}
+
+	@Scheduled(cron = "0 * * * * *")
+	void sendInterfaceTraffic() {
+		webSocketService.sendTrafficInterface(mikroTikService.getTrafficByMinutes())
 	}
 }
