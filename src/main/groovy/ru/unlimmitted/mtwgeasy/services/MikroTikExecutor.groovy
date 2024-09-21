@@ -28,6 +28,7 @@ class MikroTikExecutor {
 		try {
 			connect = ApiConnection.connect(mikrotikGateway)
 			connect.login(mikrotikUser, mikrotikPassword)
+			connect.setTimeout(5_000)
 			wgInterfaces = getInterfaces()
 			settings = readSettings()
 		} catch (Exception e) {
@@ -75,7 +76,7 @@ class MikroTikExecutor {
 		try {
 			initializeConnection()
 		} catch (Exception e) {
-			throw new RuntimeException("Reconnection failed: ${e.message}", e)
+			throw new RuntimeException("Reconnection failed: ${e.message}")
 		}
 	}
 
@@ -87,7 +88,7 @@ class MikroTikExecutor {
 				reconnect()
 				return executeCommand(command)
 			} else {
-				throw new RuntimeException("Failed to execute command: $command: ${e.message}", e)
+				throw new RuntimeException("Failed to execute command: $command: ${e.message}")
 			}
 		}
 	}
