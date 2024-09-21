@@ -16,9 +16,9 @@ class MikroTikExecutor {
 
 	String mikrotikGateway = System.getenv("GATEWAY")
 
-	String mikrotikUser = System.getenv("MIKROTIK_USER")
+	private String mikrotikUser = System.getenv("MIKROTIK_USER")
 
-	String mikrotikPassword = System.getenv("MIKROTIK_PASSWORD")
+	private String mikrotikPassword = System.getenv("MIKROTIK_PASSWORD")
 
 	MikroTikExecutor() {
 		initializeConnection()
@@ -28,11 +28,11 @@ class MikroTikExecutor {
 		try {
 			connect = ApiConnection.connect(mikrotikGateway)
 			connect.login(mikrotikUser, mikrotikPassword)
-			connect.setTimeout(5_000)
+			connect.setTimeout(1_000)
 			wgInterfaces = getInterfaces()
 			settings = readSettings()
 		} catch (Exception e) {
-			throw new RuntimeException("Failed to connect to MikroTik", e)
+			throw new RuntimeException("Failed to connect to MikroTik: $e")
 		}
 	}
 
@@ -71,24 +71,31 @@ class MikroTikExecutor {
 			return wgInterface
 		}
 	}
-
+//	Костыль
 	private void reconnect() {
 		try {
 			initializeConnection()
 		} catch (Exception e) {
-			throw new RuntimeException("Reconnection failed: ${e.message}")
+			throw new RuntimeException("Reconnection failed: ${e.message}", e)
 		}
 	}
-
+//	Костыль
 	List<Map<String, String>> executeCommand(String command) {
 		try {
-			return connect.execute(command)
+			if (connect.connected) {
+				return connect.execute(command)
+			} else {
+				reconnect()
+			}
 		} catch (Exception e) {
 			if (e.message.contains("timed out")) {
+				if (!connect.connected) {
+					connect.close()
+				}
 				reconnect()
 				return executeCommand(command)
 			} else {
-				throw new RuntimeException("Failed to execute command: $command: ${e.message}")
+				throw new RuntimeException("Failed to execute command: $command: ${e.message}", e)
 			}
 		}
 	}

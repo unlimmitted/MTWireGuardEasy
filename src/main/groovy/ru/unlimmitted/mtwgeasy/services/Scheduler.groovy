@@ -20,7 +20,7 @@ class Scheduler {
 		webSocketService.sendInterfaces(mikroTikService.getMtInfo())
 	}
 
-	@Scheduled(cron = "*/15 * * * * *")
+	@Scheduled(cron = "*/25 * * * * *")
 	void sendPeers() {
 		webSocketService.sendPeers(mikroTikService.getPeers())
 	}
