@@ -33,6 +33,7 @@ class RouterConfigurator extends MikroTikExecutor {
 					|/interface/wireguard/add name="${routerSettings.externalWgInterfaceName}" 
 					|mtu=1400
 					|listen-port=${routerSettings.endpointPort}
+					|private-key="${routerSettings.externalWgPrivateKey}"
 					""".stripMargin().replace("\n", " ")
 			executeCommand(query)
 		}
@@ -42,8 +43,8 @@ class RouterConfigurator extends MikroTikExecutor {
 		String query = """
 				|/interface/wireguard/peers/add name="ExternalWG"
 				|interface="${routerSettings.externalWgInterfaceName}"
-				|public-key="${routerSettings.externalWgPublicKey}
-				|preshared-key="${routerSettings.externalWgPresharedKey}" 
+				|public-key="${routerSettings.externalWgPublicKey}"
+				|${routerSettings.externalWgPresharedKey !== null ? "preshared-key='${routerSettings.externalWgPresharedKey}'" : ''}
 				|endpoint-address=${routerSettings.endpoint}
 				|endpoint-port=${routerSettings.endpointPort} allowed-address="${routerSettings.allowedAddress}"
 				|persistent-keepalive=20
@@ -84,7 +85,7 @@ class RouterConfigurator extends MikroTikExecutor {
 			query = """
 					|/ip/address/add
 					|address=${routerSettings.ipAddress.split("/").first()}/24
-					|interface=${routerSettings.inputWgInterfaceName}
+					|interface=${routerSettings.externalWgInterfaceName}
 					""".stripMargin().replace("\n", " ")
 			executeCommand(query)
 
@@ -147,16 +148,20 @@ class RouterConfigurator extends MikroTikExecutor {
 	}
 
 	void run() {
-		createBackup()
-		createInterfaces()
-		createInteriorPeer()
-		if (routerSettings.vpnChainMode) {
-			createExternalPeer()
+		try {
+			createBackup()
+			createInterfaces()
+			createInteriorPeer()
+			if (routerSettings.vpnChainMode) {
+				createExternalPeer()
+			}
+			createRoutingTable()
+			createIpRule()
+			saveSettings()
+			createPortForwardRule()
+			isConfigured = true
+		} catch (Exception ex) {
+			throw new RuntimeException("Configuration error: ${ex.message}", ex)
 		}
-		createRoutingTable()
-		createIpRule()
-		saveSettings()
-		createPortForwardRule()
-		isConfigured = true
 	}
 }

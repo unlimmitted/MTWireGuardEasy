@@ -27,6 +27,7 @@ class ApiController {
 
 	@GetMapping("/get-mikrotik-settings")
 	ResponseEntity<Object> getMikroTikSettings() {
+		mikroTikService.isSettings()
 		if (mikroTikService.isConfigured) {
 			return ResponseEntity.ok().body(mikroTikService.settings)
 		} else {
