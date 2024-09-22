@@ -5,6 +5,7 @@ import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.annotation.*
 import ru.unlimmitted.mtwgeasy.dto.MtSettings
 import ru.unlimmitted.mtwgeasy.dto.Peer
+import ru.unlimmitted.mtwgeasy.services.MikroTikExecutor
 import ru.unlimmitted.mtwgeasy.services.MikroTikService
 
 @RestController
@@ -26,7 +27,7 @@ class ApiController {
 
 	@GetMapping("/get-mikrotik-settings")
 	ResponseEntity<Object> getMikroTikSettings() {
-		if (mikroTikService.isSettings()) {
+		if (mikroTikService.isConfigured) {
 			return ResponseEntity.ok().body(mikroTikService.settings)
 		} else {
 			return ResponseEntity.ok().body(false)

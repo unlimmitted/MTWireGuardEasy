@@ -17,21 +17,29 @@ class Scheduler {
 
 	@Scheduled(cron = "0 * * * * *")
 	void sendInterfaces() {
-		webSocketService.sendInterfaces(mikroTikService.getMtInfo())
+		if (mikroTikService.isConfigured) {
+			webSocketService.sendInterfaces(mikroTikService.getMtInfo())
+		}
 	}
 
 	@Scheduled(cron = "*/25 * * * * *")
 	void sendPeers() {
-		webSocketService.sendPeers(mikroTikService.getPeers())
+		if (mikroTikService.isConfigured) {
+			webSocketService.sendPeers(mikroTikService.getPeers())
+		}
 	}
 
 	@Scheduled(cron = "0 * * * * *")
 	void saveInterfaceTraffic() {
-		mikroTikService.saveInterfaceTraffic()
+		if (mikroTikService.isConfigured) {
+			mikroTikService.saveInterfaceTraffic()
+		}
 	}
 
 	@Scheduled(cron = "0 * * * * *")
 	void sendInterfaceTraffic() {
-		webSocketService.sendTrafficInterface(mikroTikService.getTrafficByMinutes())
+		if (mikroTikService.isConfigured) {
+			webSocketService.sendTrafficInterface(mikroTikService.getTrafficByMinutes())
+		}
 	}
 }

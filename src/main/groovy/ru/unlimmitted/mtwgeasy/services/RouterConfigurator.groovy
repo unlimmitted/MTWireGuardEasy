@@ -124,7 +124,7 @@ class RouterConfigurator extends MikroTikExecutor {
 
 	private void createPortForwardRule() {
 		String forwardQuery = """
-				|/ip/firewall/nat
+				|/ip/firewall/nat/add
 				|comment="WGMTEasyFWD"
 				|action=dst-nat
 				|chain=dstnat
@@ -134,14 +134,16 @@ class RouterConfigurator extends MikroTikExecutor {
 				|to-addresses=${mikrotikGateway}
 		""".stripMargin().replace("\n", " ")
 		executeCommand(forwardQuery)
-		String masqueradeQuery = """
-				|/ip/firewall/nat
+		if (routerSettings.vpnChainMode) {
+			String masqueradeQuery = """
+				|/ip/firewall/nat/add
 				|comment="WGMTEasyFWD"
 				|action=masquerade
 				|chain=srcnat
 				|out-interface=${routerSettings.externalWgInterfaceName}
-		""".stripMargin().replace("\n", " ")
-		executeCommand(masqueradeQuery)
+			""".stripMargin().replace("\n", " ")
+			executeCommand(masqueradeQuery)
+		}
 	}
 
 	void run() {
@@ -155,5 +157,6 @@ class RouterConfigurator extends MikroTikExecutor {
 		createIpRule()
 		saveSettings()
 		createPortForwardRule()
+		isConfigured = true
 	}
 }

@@ -1,7 +1,6 @@
 package ru.unlimmitted.mtwgeasy.services
 
 import com.fasterxml.jackson.databind.ObjectMapper
-import lombok.extern.java.Log
 import org.springframework.stereotype.Service
 import org.whispersystems.curve25519.Curve25519
 import org.whispersystems.curve25519.Curve25519KeyPair
@@ -97,9 +96,17 @@ class MikroTikService extends MikroTikExecutor {
 
 	MtInfo getMtInfo() {
 		MtInfo mtInfo = new MtInfo()
-		executeCommand('/system/routerboard/print').forEach {
-			mtInfo.routerBoard = it.get('board-name')
-			mtInfo.version = it.get('upgrade-firmware')
+		try {
+			executeCommand("/system/routerboard/print").forEach {
+				mtInfo.routerBoard = it.get('board-name')
+				mtInfo.version = it.get('upgrade-firmware')
+				mtInfo.interfaces = wgInterfaces
+			}
+		} catch (Exception e) {
+			if (e.message.contains("no such command prefix")) {
+				mtInfo.routerBoard = "<undefined>"
+				mtInfo.routerBoard = "<undefined>"
+			}
 			mtInfo.interfaces = wgInterfaces
 		}
 		return mtInfo
@@ -165,9 +172,15 @@ class MikroTikService extends MikroTikExecutor {
 	}
 
 	List<TrafficRate> getTrafficByMinutes() {
-		def json = executeCommand('/file/print')
+		String json = executeCommand('/file/print')
 				.find { it.name == trafficRateFileName }
 				?.contents
+		if (json == null) {
+			saveInterfaceTraffic()
+			json = executeCommand('/file/print')
+					.find { it.name == trafficRateFileName }
+					?.contents
+		}
 		ObjectMapper mapper = new ObjectMapper()
 		List<TrafficRate> rates = mapper.readValue(json, mapper.getTypeFactory().constructCollectionType(List.class, TrafficRate.class))
 		return LongStream.range(1, rates.size())

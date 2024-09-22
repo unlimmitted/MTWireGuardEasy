@@ -20,6 +20,8 @@ class MikroTikExecutor {
 
 	private String mikrotikPassword = System.getenv("MIKROTIK_PASSWORD")
 
+	Boolean isConfigured = false
+
 	MikroTikExecutor() {
 		initializeConnection()
 	}
@@ -29,8 +31,11 @@ class MikroTikExecutor {
 			connect = ApiConnection.connect(mikrotikGateway)
 			connect.login(mikrotikUser, mikrotikPassword)
 			connect.setTimeout(1_000)
-			wgInterfaces = getInterfaces()
-			settings = readSettings()
+			isConfigured = isSettings()
+			if (isConfigured){
+				wgInterfaces = getInterfaces()
+				settings = readSettings()
+			}
 		} catch (Exception e) {
 			throw new RuntimeException("Failed to connect to MikroTik: $e")
 		}
@@ -38,7 +43,7 @@ class MikroTikExecutor {
 
 	private MtSettings readSettings() {
 		ObjectMapper objectMapper = new ObjectMapper()
-		if (isSettings()) {
+		if (isConfigured) {
 			return objectMapper.readValue(
 					executeCommand('/file/print').find {
 						it.name == 'WGMTSettings.conf'
