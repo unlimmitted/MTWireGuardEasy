@@ -14,8 +14,6 @@ import java.util.stream.LongStream
 @Service
 class MikroTikService extends MikroTikExecutor {
 
-	private static final String trafficRateFileName = "traffic_rate.txt"
-
 	MikroTikService() {
 		super()
 	}
@@ -96,18 +94,17 @@ class MikroTikService extends MikroTikExecutor {
 
 	MtInfo getMtInfo() {
 		MtInfo mtInfo = new MtInfo()
+		mtInfo.interfaces = wgInterfaces
 		try {
 			executeCommand("/system/routerboard/print").forEach {
 				mtInfo.routerBoard = it.get('board-name')
 				mtInfo.version = it.get('upgrade-firmware')
-				mtInfo.interfaces = wgInterfaces
 			}
 		} catch (Exception e) {
 			if (e.message.contains("no such command prefix")) {
 				mtInfo.routerBoard = "<undefined>"
-				mtInfo.routerBoard = "<undefined>"
+				mtInfo.version = "<undefined>"
 			}
-			mtInfo.interfaces = wgInterfaces
 		}
 		return mtInfo
 	}
@@ -144,54 +141,6 @@ class MikroTikService extends MikroTikExecutor {
 		String addressListId = findPeerInAddressList(lists, peer.allowedAddress.split('/').first()).id
 		executeCommand("/interface/wireguard/peers/remove numbers=$peerId")
 		executeCommand("/ip/firewall/address-list/remove numbers=$addressListId")
-	}
-
-	void saveInterfaceTraffic() {
-		String json = executeCommand('/file/print')
-				.find { it.name == trafficRateFileName }?.contents
-				?: "[]"
-		if (json != "[]") {
-			initializeConnection()
-			Integer number = executeCommand("/file/print")
-					.indexed()
-					.find { index, it -> it.name == trafficRateFileName }
-					.key
-			executeCommand("/file/remove numbers=$number")
-		}
-		Long tX = getMtInfo().interfaces.find { it.name == settings.inputWgInterfaceName }.txByte.toLong() as Long
-		Long rX = getMtInfo().interfaces.find { it.name == settings.inputWgInterfaceName }.rxByte.toLong() as Long
-		TrafficRate rate = new TrafficRate(tX, rX, Instant.now())
-		ObjectMapper mapper = new ObjectMapper()
-		List<TrafficRate> rates = (mapper.readValue(json, mapper.getTypeFactory().constructCollectionType(List.class, TrafficRate.class)) as List<TrafficRate>)
-				.findAll {
-					Instant.ofEpochSecond(it.time) > Instant.now().minus(1, ChronoUnit.HOURS)
-				}
-		rates.add(rate)
-		json = mapper.writeValueAsString(rates)
-		executeCommand("/file/add name=\"${trafficRateFileName}\" contents='${json}'")
-	}
-
-	List<TrafficRate> getTrafficByMinutes() {
-		String json = executeCommand('/file/print')
-				.find { it.name == trafficRateFileName }
-				?.contents
-		if (json == null) {
-			saveInterfaceTraffic()
-			json = executeCommand('/file/print')
-					.find { it.name == trafficRateFileName }
-					?.contents
-		}
-		ObjectMapper mapper = new ObjectMapper()
-		List<TrafficRate> rates = mapper.readValue(json, mapper.getTypeFactory().constructCollectionType(List.class, TrafficRate.class))
-		return LongStream.range(1, rates.size())
-				.mapToObj { i ->
-					new TrafficRate(
-							(rates[i].tx - rates[i - 1].tx) / 1_048_576 as Long,
-							(rates[i].rx - rates[i - 1].rx) / 1_048_576 as Long,
-							Instant.ofEpochSecond(rates[i].time)
-					)
-				}
-				.toList()
 	}
 
 }

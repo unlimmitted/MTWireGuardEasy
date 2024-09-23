@@ -6,6 +6,7 @@ import org.springframework.web.bind.annotation.*
 import ru.unlimmitted.mtwgeasy.dto.MtSettings
 import ru.unlimmitted.mtwgeasy.dto.Peer
 import ru.unlimmitted.mtwgeasy.services.MikroTikExecutor
+import ru.unlimmitted.mtwgeasy.services.MikroTikFiles
 import ru.unlimmitted.mtwgeasy.services.MikroTikService
 
 @RestController
@@ -14,6 +15,9 @@ class ApiController {
 
 	@Autowired
 	MikroTikService mikroTikService
+
+	@Autowired
+	MikroTikFiles mikroTikFiles
 
 	@GetMapping("/get-wg-peers")
 	ResponseEntity<Object> getWgPeers() {
@@ -61,6 +65,6 @@ class ApiController {
 
 	@GetMapping("/get-traffic-by-minutes")
 	ResponseEntity<Object> getTrafficByMinutes() {
-		return ResponseEntity.ok().body(mikroTikService.getTrafficByMinutes())
+		return ResponseEntity.ok().body(mikroTikFiles.getTrafficByMinutes())
 	}
 }

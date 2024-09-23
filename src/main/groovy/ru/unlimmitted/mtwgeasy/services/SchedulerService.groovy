@@ -4,16 +4,17 @@ import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.scheduling.annotation.Scheduled
 import org.springframework.stereotype.Service
 
-import java.util.concurrent.TimeUnit
-
 @Service
-class Scheduler {
+class SchedulerService {
 
 	@Autowired
 	MikroTikService mikroTikService
 
 	@Autowired
 	WebSocketService webSocketService
+
+	@Autowired
+	MikroTikFiles mikroTikFiles
 
 	@Scheduled(cron = "0 * * * * *")
 	void sendInterfaces() {
@@ -29,17 +30,17 @@ class Scheduler {
 		}
 	}
 
-	@Scheduled(cron = "0 * * * * *")
+	@Scheduled(cron = "*/30 * * * * *")
 	void saveInterfaceTraffic() {
 		if (mikroTikService.isConfigured) {
-			mikroTikService.saveInterfaceTraffic()
+			mikroTikFiles.saveInterfaceTraffic()
 		}
 	}
 
 	@Scheduled(cron = "0 * * * * *")
 	void sendInterfaceTraffic() {
 		if (mikroTikService.isConfigured) {
-			webSocketService.sendTrafficInterface(mikroTikService.getTrafficByMinutes())
+			webSocketService.sendTrafficInterface(mikroTikFiles.getTrafficByMinutes())
 		}
 	}
 }

@@ -32,12 +32,16 @@ class MikroTikExecutor {
 			connect.login(mikrotikUser, mikrotikPassword)
 			connect.setTimeout(1_000)
 			isConfigured = isSettings()
-			if (isConfigured){
+			if (isConfigured) {
 				wgInterfaces = getInterfaces()
 				settings = readSettings()
 			}
 		} catch (Exception e) {
-			throw new RuntimeException("Failed to connect to MikroTik: $e")
+			if (e.message.contains("timed out")) {
+				throw new RuntimeException("Time out Error")
+			} else {
+				throw new RuntimeException("Failed to connect to MikroTik: $e")
+			}
 		}
 	}
 
@@ -70,13 +74,15 @@ class MikroTikExecutor {
 			wgInterface.disabled = it.get('disabled').toBoolean()
 			wgInterface.listenPort = it.get('listen-port')
 			wgInterface.mtu = it.get('mtu')
-			Map<String, String> intStats = executeCommand("/interface/print stats where name=${wgInterface.name}").first()
+			Map<String, String> intStats = executeCommand(
+					"/interface/print stats where name=${wgInterface.name}"
+			).first()
 			wgInterface.rxByte = intStats.get("rx-byte")
 			wgInterface.txByte = intStats.get("tx-byte")
 			return wgInterface
 		}
 	}
-//	Костыль
+	/*	Костыль 1 */
 	private void reconnect() {
 		try {
 			initializeConnection()
@@ -84,7 +90,7 @@ class MikroTikExecutor {
 			throw new RuntimeException("Reconnection failed: ${e.message}", e)
 		}
 	}
-//	Костыль
+	/*	Костыль 2 */
 	List<Map<String, String>> executeCommand(String command) {
 		try {
 			if (connect.connected) {
