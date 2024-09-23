@@ -52,14 +52,10 @@ class MikroTikFiles extends MikroTikExecutor {
 		String json = ""
 		if (!isFileExists(trafficRateFileName)) {
 			saveInterfaceTraffic()
-			json = executeCommand('/file/print')
-					.find { it.name == trafficRateFileName }
-					?.contents
-		} else {
-			json = executeCommand('/file/print')
-					.find { it.name == trafficRateFileName }
-					?.contents
 		}
+		json = executeCommand('/file/print')
+				.find { it.name == trafficRateFileName }
+				?.contents
 		ObjectMapper mapper = new ObjectMapper()
 		List<TrafficRate> rates = mapper.readValue(json, mapper.getTypeFactory().constructCollectionType(List.class, TrafficRate.class))
 		return LongStream.range(1, rates.size())

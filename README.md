@@ -6,13 +6,17 @@ MikroTik system requirements:
 3. RouterOS **_not lower 7.15_** 
 
 ## **Launch command**
-```cpp
+```bash
 docker build --tag mtwgeasy . && docker run --name MTWGEasy \
  -d --no-cache -p 8080:8080 \
  -e GATEWAY=<you-mikrotik-ip> \
  -e MIKROTIK_USER=<you-mikrotik-admin-login> \
  -e MIKROTIK_PASSWORD=<you-mikrotik-pass> \
  mtwgeasy
+```
+
+```
+http://localhost:8080
 ```
 
 ## **Settings**
