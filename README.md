@@ -1,7 +1,7 @@
 **Frontend : https://github.com/unlimmitted/MTWireGuardEasy-frontend**
 
 MikroTik system requirements: 
-1. Only **_RouterBoard_** or **__MikroTik CHR__**
+1. Only **___MikroTik RouterBoard_** or **__MikroTik CHR__**
 2. **_2 Kb_** of free space
 3. RouterOS **_not lower 7.15_** 
 
