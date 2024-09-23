@@ -31,8 +31,8 @@ class ApiController {
 
 	@GetMapping("/get-mikrotik-settings")
 	ResponseEntity<Object> getMikroTikSettings() {
-		mikroTikService.isSettings()
-		if (mikroTikService.isConfigured) {
+		mikroTikService.setSettings()
+		if (mikroTikFiles.isFileExists("WGMTSettings.conf")) {
 			return ResponseEntity.ok().body(mikroTikService.settings)
 		} else {
 			return ResponseEntity.ok().body(false)
@@ -60,7 +60,7 @@ class ApiController {
 	@PostMapping("/configurator")
 	ResponseEntity<Object> startConfigurator(@RequestBody MtSettings settings) {
 		mikroTikService.runConfigurator(settings)
-		return ResponseEntity.ok().body(mikroTikService.getPeers())
+		return ResponseEntity.ok().body(mikroTikService.settings)
 	}
 
 	@GetMapping("/get-traffic-by-minutes")

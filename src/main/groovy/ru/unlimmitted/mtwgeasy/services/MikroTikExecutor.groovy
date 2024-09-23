@@ -31,10 +31,10 @@ class MikroTikExecutor {
 			connect = ApiConnection.connect(mikrotikGateway)
 			connect.login(mikrotikUser, mikrotikPassword)
 			connect.setTimeout(1_000)
-			isConfigured = isSettings()
+			setIsConfigured()
 			if (isConfigured) {
-				wgInterfaces = getInterfaces()
-				settings = readSettings()
+				setWgInterfaces()
+				setSettings()
 			}
 		} catch (Exception e) {
 			if (e.message.contains("timed out")) {
@@ -45,9 +45,21 @@ class MikroTikExecutor {
 		}
 	}
 
+	void setIsConfigured() {
+		isConfigured = isSettings()
+	}
+
+	void setWgInterfaces() {
+		wgInterfaces = getInterfaces()
+	}
+
+	void setSettings() {
+		settings = readSettings()
+	}
+
 	private MtSettings readSettings() {
 		ObjectMapper objectMapper = new ObjectMapper()
-		if (isConfigured) {
+		if (isSettings()) {
 			return objectMapper.readValue(
 					executeCommand('/file/print').find {
 						it.name == 'WGMTSettings.conf'
@@ -60,7 +72,7 @@ class MikroTikExecutor {
 		}
 	}
 
-	Boolean isSettings() {
+	private Boolean isSettings() {
 		return executeCommand('/file/print').find { it.name == 'WGMTSettings.conf' }
 	}
 
@@ -83,6 +95,7 @@ class MikroTikExecutor {
 		}
 	}
 	/*	Костыль 1 */
+
 	private void reconnect() {
 		try {
 			initializeConnection()
@@ -91,6 +104,7 @@ class MikroTikExecutor {
 		}
 	}
 	/*	Костыль 2 */
+
 	List<Map<String, String>> executeCommand(String command) {
 		try {
 			if (connect.connected) {

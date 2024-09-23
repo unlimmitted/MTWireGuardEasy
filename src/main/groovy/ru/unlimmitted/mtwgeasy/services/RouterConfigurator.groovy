@@ -11,9 +11,7 @@ class RouterConfigurator extends MikroTikExecutor {
 
 	RouterConfigurator(MtSettings routerSettings) {
 		super()
-		connect = super.connect
 		this.routerSettings = routerSettings
-		wgInterfaces = super.wgInterfaces
 	}
 
 	private void createBackup() {
@@ -121,6 +119,7 @@ class RouterConfigurator extends MikroTikExecutor {
 		ObjectMapper mapper = new ObjectMapper()
 		String res = mapper.writeValueAsString(routerSettings).replace("\"", "\\\"")
 		executeCommand("/file/add name=\"WGMTSettings.conf\" contents='${res}'")
+		setSettings()
 	}
 
 	private void createPortForwardRule() {
@@ -155,11 +154,12 @@ class RouterConfigurator extends MikroTikExecutor {
 			if (routerSettings.vpnChainMode) {
 				createExternalPeer()
 			}
+			setWgInterfaces()
 			createRoutingTable()
 			createIpRule()
 			saveSettings()
 			createPortForwardRule()
-			isConfigured = true
+			setIsConfigured()
 		} catch (Exception ex) {
 			throw new RuntimeException("Configuration error: ${ex.message}", ex)
 		}

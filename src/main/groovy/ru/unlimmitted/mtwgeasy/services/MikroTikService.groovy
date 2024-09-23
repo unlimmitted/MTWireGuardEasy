@@ -1,15 +1,12 @@
 package ru.unlimmitted.mtwgeasy.services
 
-import com.fasterxml.jackson.databind.ObjectMapper
+
 import org.springframework.stereotype.Service
 import org.whispersystems.curve25519.Curve25519
 import org.whispersystems.curve25519.Curve25519KeyPair
 import ru.unlimmitted.mtwgeasy.dto.*
 
-import java.time.Instant
-import java.time.temporal.ChronoUnit
 import java.util.regex.Matcher
-import java.util.stream.LongStream
 
 @Service
 class MikroTikService extends MikroTikExecutor {
@@ -94,6 +91,9 @@ class MikroTikService extends MikroTikExecutor {
 
 	MtInfo getMtInfo() {
 		MtInfo mtInfo = new MtInfo()
+		if (wgInterfaces == null) {
+			setWgInterfaces()
+		}
 		mtInfo.interfaces = wgInterfaces
 		try {
 			executeCommand("/system/routerboard/print").forEach {

@@ -15,15 +15,15 @@ class MikroTikFiles extends MikroTikExecutor {
 
 	Boolean isFileExists(String fileName) {
 		List<Map<String, String>> files = executeCommand('/file/print')
-		if (files.find { it.name == fileName } != null) {
-			return true
-		}
-		return false
+		return files.find { it.name == fileName } != null
 	}
 
 	void saveInterfaceTraffic() {
 		String json = "[]"
 		if (isFileExists(trafficRateFileName)) {
+			if (connect.connected) {
+				connect.close()
+			}
 			initializeConnection()
 			json = executeCommand('/file/print')
 					.find {
@@ -49,6 +49,8 @@ class MikroTikFiles extends MikroTikExecutor {
 	}
 
 	List<TrafficRate> getTrafficByMinutes() {
+		setWgInterfaces()
+		setSettings()
 		String json = ""
 		if (!isFileExists(trafficRateFileName)) {
 			saveInterfaceTraffic()
