@@ -31,5 +31,3 @@ docker build --tag mtwgeasy . && docker run --name MTWGEasy \
 
 ###### **Peer modal**
 ![peerModal](https://github.com/user-attachments/assets/578e0438-1879-4757-8443-76f33079d9eb)
-
-###### **Settings screen**
