@@ -17,8 +17,10 @@ docker build --tag mtwgeasy . && docker run --name MTWGEasy \
 
 ## **Settings**
 #### **Only wireguard server**
+![photo_2024-09-22_17-19-24](https://github.com/user-attachments/assets/956d8d75-caaf-4135-ac1c-fe40fcccb047)
 
 #### **VPN chain mode**
+###### In progress
 
 ## **Appearance:**
 
