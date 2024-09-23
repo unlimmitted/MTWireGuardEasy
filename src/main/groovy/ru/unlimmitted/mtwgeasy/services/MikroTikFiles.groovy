@@ -13,11 +13,22 @@ class MikroTikFiles extends MikroTikExecutor {
 
 	private static final String trafficRateFileName = "traffic_rate.txt"
 
+	Boolean isFileExists(String fileName) {
+		List<Map<String, String>> files = executeCommand('/file/print')
+		if (files.find { it.name == fileName } != null) {
+			return true
+		}
+		return false
+	}
+
 	void saveInterfaceTraffic() {
-		String json = executeCommand('/file/print')
-				.find { it.name == trafficRateFileName }?.contents ?: "[]"
-		if (json != "[]") {
+		String json = "[]"
+		if (isFileExists(trafficRateFileName)) {
 			initializeConnection()
+			json = executeCommand('/file/print')
+					.find {
+						it.name == trafficRateFileName
+					}?.contents
 			Integer number = executeCommand("/file/print")
 					.indexed()
 					.find { index, it -> it.name == trafficRateFileName }
@@ -38,11 +49,13 @@ class MikroTikFiles extends MikroTikExecutor {
 	}
 
 	List<TrafficRate> getTrafficByMinutes() {
-		String json = executeCommand('/file/print')
-				.find { it.name == trafficRateFileName }
-				?.contents
-		if (json == null) {
+		String json = ""
+		if (!isFileExists(trafficRateFileName)) {
 			saveInterfaceTraffic()
+			json = executeCommand('/file/print')
+					.find { it.name == trafficRateFileName }
+					?.contents
+		} else {
 			json = executeCommand('/file/print')
 					.find { it.name == trafficRateFileName }
 					?.contents
