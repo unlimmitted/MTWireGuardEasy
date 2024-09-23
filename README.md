@@ -20,7 +20,9 @@ docker build --tag mtwgeasy . && docker run --name MTWGEasy \
 ![photo_2024-09-22_17-19-24](https://github.com/user-attachments/assets/956d8d75-caaf-4135-ac1c-fe40fcccb047)
 
 #### **VPN chain mode**
-###### In progress
+**For the settings to appear, you need to activate the Enable Double WireGuard VPN checkbox**
+![photo_2024-09-23_19-18-57](https://github.com/user-attachments/assets/db1b7cfb-501a-45e3-b398-2252fd386df1)
+
 
 ## **Appearance:**
 
