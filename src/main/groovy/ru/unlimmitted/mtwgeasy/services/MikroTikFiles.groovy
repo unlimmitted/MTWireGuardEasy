@@ -3,6 +3,7 @@ package ru.unlimmitted.mtwgeasy.services
 import com.fasterxml.jackson.databind.ObjectMapper
 import org.springframework.stereotype.Service
 import ru.unlimmitted.mtwgeasy.dto.TrafficRate
+import ru.unlimmitted.mtwgeasy.dto.WgInterface
 
 import java.time.Instant
 import java.time.temporal.ChronoUnit
@@ -14,8 +15,7 @@ class MikroTikFiles extends MikroTikExecutor {
 	private static final String trafficRateFileName = "traffic_rate.txt"
 
 	Boolean isFileExists(String fileName) {
-		List<Map<String, String>> files = executeCommand('/file/print')
-		return files.find { it.name == fileName } != null
+		return !executeCommand("/file/print where name=\"${fileName}\"").isEmpty()
 	}
 
 	void saveInterfaceTraffic() {
@@ -25,18 +25,13 @@ class MikroTikFiles extends MikroTikExecutor {
 				connect.close()
 			}
 			initializeConnection()
-			json = executeCommand('/file/print')
-					.find {
-						it.name == trafficRateFileName
-					}?.contents
-			Integer number = executeCommand("/file/print")
-					.indexed()
-					.find { index, it -> it.name == trafficRateFileName }
-					.key
-			executeCommand("/file/remove numbers=$number")
+			json = executeCommand("/file/print where name=\"${trafficRateFileName}\"").contents.first
+			String id = executeCommand("/file/print where name=\"${trafficRateFileName}\"")['.id'].first
+			executeCommand("/file/remove numbers=$id")
 		}
-		Long tX = wgInterfaces.find { it.name == settings.inputWgInterfaceName }.txByte.toLong() as Long
-		Long rX = wgInterfaces.find { it.name == settings.inputWgInterfaceName }.rxByte.toLong() as Long
+		WgInterface inputInterface = wgInterfaces.find { it.name == settings.inputWgInterfaceName }
+		Long tX = inputInterface.txByte.toLong() as Long
+		Long rX = inputInterface.rxByte.toLong() as Long
 		TrafficRate rate = new TrafficRate(tX, rX, Instant.now())
 		ObjectMapper mapper = new ObjectMapper()
 		List<TrafficRate> rates = (mapper.readValue(json, mapper.getTypeFactory().constructCollectionType(List.class, TrafficRate.class)) as List<TrafficRate>)
@@ -51,13 +46,10 @@ class MikroTikFiles extends MikroTikExecutor {
 	List<TrafficRate> getTrafficByMinutes() {
 		setWgInterfaces()
 		setSettings()
-		String json = ""
 		if (!isFileExists(trafficRateFileName)) {
 			saveInterfaceTraffic()
 		}
-		json = executeCommand('/file/print')
-				.find { it.name == trafficRateFileName }
-				?.contents
+		String json = executeCommand("/file/print where name=\"${trafficRateFileName}\"").contents.first
 		ObjectMapper mapper = new ObjectMapper()
 		List<TrafficRate> rates = mapper.readValue(json, mapper.getTypeFactory().constructCollectionType(List.class, TrafficRate.class))
 		return LongStream.range(1, rates.size())

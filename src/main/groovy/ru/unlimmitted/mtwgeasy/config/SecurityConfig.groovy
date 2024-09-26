@@ -25,7 +25,8 @@ class SecurityConfig {
 		return http
 				.csrf().disable()
 				.authorizeHttpRequests(authorize -> authorize
-						.requestMatchers("/js/**", "/css/**", "/logo.png", "/favicon.png").permitAll()
+						.requestMatchers("/js/**", "/css/**", "/logo.png",
+								"/favicon.png").permitAll()
 						.requestMatchers("/login").permitAll()
 						.anyRequest().authenticated()
 				)

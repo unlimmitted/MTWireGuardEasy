@@ -50,23 +50,6 @@ class RouterConfigurator extends MikroTikExecutor {
 		executeCommand(query)
 	}
 
-	private void createInteriorPeer() {
-		Curve25519KeyPair keyPair = Curve25519.getInstance(Curve25519.JAVA).generateKeyPair()
-		String pubKey = Base64.getEncoder().encodeToString(keyPair.getPublicKey())
-		String ipAddress = routerSettings.inputWgAddress.split("\\.").last()
-		String mask = ipAddress.split("/").last()
-		String address = routerSettings.inputWgAddress.replace(ipAddress, "${getHostNumber()}/${mask}")
-		String query = """
-				|/interface/wireguard/peers/add 
-				|interface="${routerSettings.inputWgInterfaceName}"
-				|public-key="${pubKey}" 
-				|allowed-address=${address}
-				|name="InteriorWG"
-				|persistent-keepalive=20
-				""".stripMargin().replace("\n", " ")
-		executeCommand(query)
-	}
-
 	private void createRoutingTable() {
 		executeCommand("/routing/table/add disabled=no fib=True name=${routerSettings.toVpnTableName}")
 	}
@@ -150,7 +133,6 @@ class RouterConfigurator extends MikroTikExecutor {
 		try {
 			createBackup()
 			createInterfaces()
-			createInteriorPeer()
 			if (routerSettings.vpnChainMode) {
 				createExternalPeer()
 			}

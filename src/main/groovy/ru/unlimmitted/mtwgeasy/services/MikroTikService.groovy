@@ -74,7 +74,7 @@ class MikroTikService extends MikroTikExecutor {
 		executeCommand('/ip/firewall/address-list/print').forEach({
 			AddressList addressList = new AddressList()
 			addressList.id = it.get('.id')
-//			addressList.disabled = it.get('disabled').toBoolean()
+			addressList.disabled = it.get('disabled').toBoolean()
 			addressList.comment = it.get('comment')
 			addressList.listName = it.get('list')
 			addressList.address = it.get('address')

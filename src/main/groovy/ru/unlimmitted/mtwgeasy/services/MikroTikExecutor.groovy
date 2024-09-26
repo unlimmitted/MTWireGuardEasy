@@ -14,11 +14,13 @@ class MikroTikExecutor {
 	MtSettings settings
 	List<WgInterface> wgInterfaces
 
-	String mikrotikGateway = System.getenv("GATEWAY")
+	final String mikrotikGateway = System.getenv("GATEWAY")
 
 	private String mikrotikUser = System.getenv("MIKROTIK_USER")
 
 	private String mikrotikPassword = System.getenv("MIKROTIK_PASSWORD")
+
+	final String settingsFile = "WGMTSettings.conf"
 
 	Boolean isConfigured = false
 
@@ -30,7 +32,7 @@ class MikroTikExecutor {
 		try {
 			connect = ApiConnection.connect(mikrotikGateway)
 			connect.login(mikrotikUser, mikrotikPassword)
-			connect.setTimeout(1_000)
+			connect.setTimeout(5_000)
 			setIsConfigured()
 			if (isConfigured) {
 				setWgInterfaces()
@@ -73,17 +75,15 @@ class MikroTikExecutor {
 	}
 
 	private Boolean isSettings() {
-		return executeCommand('/file/print').find { it.name == 'WGMTSettings.conf' }
+		return !executeCommand("/file/print where name=\"${settingsFile}\"").isEmpty()
 	}
 
 	private List<WgInterface> getInterfaces() {
 		return executeCommand('/interface/wireguard/print').collect {
 			WgInterface wgInterface = new WgInterface()
 			wgInterface.name = it.get('name')
-			wgInterface.running = it.get('running').toBoolean()
 			wgInterface.privateKey = it.get('private-key')
 			wgInterface.publicKey = it.get('public-key')
-			wgInterface.disabled = it.get('disabled').toBoolean()
 			wgInterface.listenPort = it.get('listen-port')
 			wgInterface.mtu = it.get('mtu')
 			Map<String, String> intStats = executeCommand(
@@ -94,7 +94,6 @@ class MikroTikExecutor {
 			return wgInterface
 		}
 	}
-	/*	Костыль 1 */
 
 	private void reconnect() {
 		try {
@@ -103,7 +102,6 @@ class MikroTikExecutor {
 			throw new RuntimeException("Reconnection failed: ${e.message}", e)
 		}
 	}
-	/*	Костыль 2 */
 
 	List<Map<String, String>> executeCommand(String command) {
 		try {
@@ -118,7 +116,7 @@ class MikroTikExecutor {
 					connect.close()
 				}
 				reconnect()
-				return executeCommand(command)
+				return connect.execute(command)
 			} else {
 				throw new RuntimeException("Failed to execute command: $command: ${e.message}", e)
 			}

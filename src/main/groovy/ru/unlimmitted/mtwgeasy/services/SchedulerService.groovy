@@ -37,10 +37,18 @@ class SchedulerService {
 		}
 	}
 
-	@Scheduled(cron = "0 * * * * *")
+	@Scheduled(cron = "10 * * * * *")
 	void sendInterfaceTraffic() {
 		if (mikroTikService.isConfigured) {
 			webSocketService.sendTrafficInterface(mikroTikFiles.getTrafficByMinutes())
 		}
+	}
+
+	@Scheduled(cron = "30 * * * * *")
+	void reconnectToMikrotik() {
+		if (mikroTikService.connect.isConnected()) {
+			mikroTikService.connect.close()
+		}
+		mikroTikService.initializeConnection()
 	}
 }
