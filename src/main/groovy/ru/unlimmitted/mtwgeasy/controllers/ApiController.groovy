@@ -32,7 +32,7 @@ class ApiController {
 	@GetMapping("/get-mikrotik-settings")
 	ResponseEntity<Object> getMikroTikSettings() {
 		mikroTikService.setSettings()
-		if (mikroTikFiles.isFileExists("WGMTSettings.conf")) {
+		if (mikroTikService.isSettings()) {
 			return ResponseEntity.ok().body(mikroTikService.settings)
 		} else {
 			return ResponseEntity.ok().body(false)

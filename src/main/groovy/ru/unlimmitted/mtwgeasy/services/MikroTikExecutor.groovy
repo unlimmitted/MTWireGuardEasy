@@ -63,9 +63,10 @@ class MikroTikExecutor {
 		ObjectMapper objectMapper = new ObjectMapper()
 		if (isSettings()) {
 			return objectMapper.readValue(
-					executeCommand('/file/print').find {
-						it.name == 'WGMTSettings.conf'
-					}.contents.replace("\\\"", "\""),
+					executeCommand("/file/print where name=\"${settingsFile}\"")
+							.contents
+							.first
+							.replace("\\\"", "\""),
 					MtSettings.class
 			)
 		} else {
@@ -74,7 +75,7 @@ class MikroTikExecutor {
 		}
 	}
 
-	private Boolean isSettings() {
+	Boolean isSettings() {
 		return !executeCommand("/file/print where name=\"${settingsFile}\"").isEmpty()
 	}
 

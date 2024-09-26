@@ -101,7 +101,7 @@ class RouterConfigurator extends MikroTikExecutor {
 	private void saveSettings() {
 		ObjectMapper mapper = new ObjectMapper()
 		String res = mapper.writeValueAsString(routerSettings).replace("\"", "\\\"")
-		executeCommand("/file/add name=\"WGMTSettings.conf\" contents='${res}'")
+		executeCommand("/file/add name=\"${settingsFile}\" contents='${res}'")
 		setSettings()
 	}
 
