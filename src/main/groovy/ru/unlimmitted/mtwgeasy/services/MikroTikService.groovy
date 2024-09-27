@@ -63,6 +63,21 @@ class MikroTikService extends MikroTikExecutor {
 		return peers
 	}
 
+	List<EtherInterface> getEtherInterfaces() {
+		List<EtherInterface> interfaces = new ArrayList<>()
+		executeCommand("/interface/print where type=\"ether\"").forEach {
+			EtherInterface etherInterface = new EtherInterface()
+			etherInterface.id = it.get(".id")
+			etherInterface.name = it.get("name")
+			etherInterface.macAddress = it.get("mac-address")
+			etherInterface.network = executeCommand(
+					"/ip/address/print where interface=\"${it.get("name")}\""
+			).network.first
+			interfaces.add(etherInterface)
+		}
+		return interfaces
+	}
+
 	WgInterface findInterface(String interfaceName) {
 		return wgInterfaces.find({
 			it.name == interfaceName

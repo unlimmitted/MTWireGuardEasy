@@ -67,4 +67,9 @@ class ApiController {
 	ResponseEntity<Object> getTrafficByMinutes() {
 		return ResponseEntity.ok().body(mikroTikFiles.getTrafficByMinutes())
 	}
+
+	@GetMapping("/get-ether-interfaces")
+	ResponseEntity<Object> getEtherInterfaces () {
+		return ResponseEntity.ok().body(mikroTikService.getEtherInterfaces())
+	}
 }
