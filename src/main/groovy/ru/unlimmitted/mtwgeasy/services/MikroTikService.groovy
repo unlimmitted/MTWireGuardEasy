@@ -158,4 +158,8 @@ class MikroTikService extends MikroTikExecutor {
 		executeCommand("/ip/firewall/address-list/remove numbers=$addressListId")
 	}
 
+	void changeVpnRouting (WgInterface wgInterface) {
+		String id = executeCommand('/ip/route/print where comment="WGMTEasy"')[".id"].first()
+		executeCommand("/ip/route/set gateway=\"${wgInterface.name}\" numbers=${id}")
+	}
 }

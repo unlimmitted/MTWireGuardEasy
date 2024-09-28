@@ -37,8 +37,8 @@ class MikroTikExecutor {
 			connect.setTimeout(5_000)
 			setIsConfigured()
 			if (isConfigured) {
-				setWgInterfaces()
 				setSettings()
+				setWgInterfaces()
 			}
 		} catch (Exception e) {
 			if (e.message.contains("timed out")) {
@@ -89,12 +89,19 @@ class MikroTikExecutor {
 			wgInterface.publicKey = it.get('public-key')
 			wgInterface.listenPort = it.get('listen-port')
 			wgInterface.mtu = it.get('mtu')
+			wgInterface.disabled = it.get('disabled').toBoolean()
 			Map<String, String> intStats = executeCommand(
 					"/interface/print stats where name=${wgInterface.name}"
 			).first()
 			wgInterface.rxByte = intStats.get("rx-byte")
 			wgInterface.txByte = intStats.get("tx-byte")
+			if (it.get("name") !== settings.inputWgInterfaceName) {
+				wgInterface.isRouting = executeCommand(
+						"/ip/route/print where comment=\"WGMTEasy\""
+				).gateway.first == it.get("name")
+			}
 			return wgInterface
+
 		}
 	}
 

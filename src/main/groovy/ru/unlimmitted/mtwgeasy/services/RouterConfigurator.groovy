@@ -86,6 +86,7 @@ class RouterConfigurator extends MikroTikExecutor {
 
 			String routesQuery = """
 					|/ip/route/add
+					|comment="WGMTEasy"
 					|distance=1
 					|dst-address=0.0.0.0/0
 					|gateway=${routerSettings.externalWgInterfaceName}

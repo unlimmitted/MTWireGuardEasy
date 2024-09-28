@@ -5,7 +5,7 @@ import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.annotation.*
 import ru.unlimmitted.mtwgeasy.dto.MtSettings
 import ru.unlimmitted.mtwgeasy.dto.Peer
-import ru.unlimmitted.mtwgeasy.services.MikroTikExecutor
+import ru.unlimmitted.mtwgeasy.dto.WgInterface
 import ru.unlimmitted.mtwgeasy.services.MikroTikFiles
 import ru.unlimmitted.mtwgeasy.services.MikroTikService
 
@@ -26,6 +26,7 @@ class ApiController {
 
 	@GetMapping("/get-mikrotik-info")
 	ResponseEntity<Object> getMikroTikInfo() {
+		mikroTikService.setWgInterfaces()
 		return ResponseEntity.ok().body(mikroTikService.getMtInfo())
 	}
 
@@ -45,8 +46,8 @@ class ApiController {
 		return ResponseEntity.ok().body(mikroTikService.getPeers())
 	}
 
-	@PostMapping("/change-routing-vpn")
-	ResponseEntity<Object> changeRoutingVpn(@RequestBody Peer peer) {
+	@PostMapping("/change-routing-peer")
+	ResponseEntity<Object> changeRoutingPeer(@RequestBody Peer peer) {
 		mikroTikService.changeRouting(peer)
 		return ResponseEntity.ok().body(mikroTikService.getPeers())
 	}
@@ -61,6 +62,13 @@ class ApiController {
 	ResponseEntity<Object> startConfigurator(@RequestBody MtSettings settings) {
 		mikroTikService.runConfigurator(settings)
 		return ResponseEntity.ok().body(mikroTikService.settings)
+	}
+
+	@PostMapping("/change-routing-vpn")
+	ResponseEntity<Object> changeRoutingVpn(@RequestBody WgInterface wgInterface) {
+		mikroTikService.changeVpnRouting(wgInterface)
+		mikroTikService.setWgInterfaces()
+		return ResponseEntity.ok().body(mikroTikService.getMtInfo())
 	}
 
 	@GetMapping("/get-traffic-by-minutes")
