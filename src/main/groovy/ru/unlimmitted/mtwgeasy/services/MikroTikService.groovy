@@ -89,7 +89,7 @@ class MikroTikService extends MikroTikExecutor {
 		executeCommand('/ip/firewall/address-list/print').forEach({
 			AddressList addressList = new AddressList()
 			addressList.id = it.get('.id')
-			addressList.disabled = it.get('disabled').toBoolean()
+			addressList.disabled = it.get('disabled') != null ? it.get('disabled').toBoolean() : false
 			addressList.comment = it.get('comment')
 			addressList.listName = it.get('list')
 			addressList.address = it.get('address')
@@ -171,9 +171,9 @@ class MikroTikService extends MikroTikExecutor {
 	void deleteExternalInterface(WgInterface wgInterface) {
 		try {
 			String id = executeCommand(
-					"/interface/wireguard/peer/print where interface=\"${wgInterface.name}\""
+					"/interface/wireguard/peers/print where interface=\"${wgInterface.name}\""
 			)[".id"].first
-			executeCommand("/interface/wireguard/peer/remove numbers=\"${id}\"")
+			executeCommand("/interface/wireguard/peers/remove numbers=\"${id}\"")
 			executeCommand("/interface/wireguard/remove numbers=\"${wgInterface.name}\"")
 		} catch (Exception ex) {
 			System.out.println("Fail delete peer: $ex")
