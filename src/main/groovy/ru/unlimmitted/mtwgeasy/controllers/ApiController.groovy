@@ -3,7 +3,8 @@ package ru.unlimmitted.mtwgeasy.controllers
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.annotation.*
-import ru.unlimmitted.mtwgeasy.dto.MtSettings
+import ru.unlimmitted.mtwgeasy.dto.MikroTikSettings
+import ru.unlimmitted.mtwgeasy.dto.NewWireguardInterface
 import ru.unlimmitted.mtwgeasy.dto.Peer
 import ru.unlimmitted.mtwgeasy.dto.WgInterface
 import ru.unlimmitted.mtwgeasy.services.MikroTikFiles
@@ -27,7 +28,7 @@ class ApiController {
 	@GetMapping("/get-mikrotik-info")
 	ResponseEntity<Object> getMikroTikInfo() {
 		mikroTikService.setWgInterfaces()
-		return ResponseEntity.ok().body(mikroTikService.getMtInfo())
+		return ResponseEntity.ok().body(mikroTikService.getMikroTikInfo())
 	}
 
 	@GetMapping("/get-mikrotik-settings")
@@ -59,7 +60,7 @@ class ApiController {
 	}
 
 	@PostMapping("/configurator")
-	ResponseEntity<Object> startConfigurator(@RequestBody MtSettings settings) {
+	ResponseEntity<Object> startConfigurator(@RequestBody MikroTikSettings settings) {
 		mikroTikService.runConfigurator(settings)
 		return ResponseEntity.ok().body(mikroTikService.settings)
 	}
@@ -68,7 +69,7 @@ class ApiController {
 	ResponseEntity<Object> changeRoutingVpn(@RequestBody WgInterface wgInterface) {
 		mikroTikService.changeVpnRouting(wgInterface)
 		mikroTikService.setWgInterfaces()
-		return ResponseEntity.ok().body(mikroTikService.getMtInfo())
+		return ResponseEntity.ok().body(mikroTikService.getMikroTikInfo())
 	}
 
 	@GetMapping("/get-traffic-by-minutes")
@@ -77,7 +78,28 @@ class ApiController {
 	}
 
 	@GetMapping("/get-ether-interfaces")
-	ResponseEntity<Object> getEtherInterfaces () {
+	ResponseEntity<Object> getEtherInterfaces() {
 		return ResponseEntity.ok().body(mikroTikService.getEtherInterfaces())
+	}
+
+	@PostMapping("/set-interface-status")
+	ResponseEntity<Object> setInterfaceStatus(@RequestBody WgInterface wgInterface) {
+		mikroTikService.setInterfaceStatus(wgInterface)
+		mikroTikService.setWgInterfaces()
+		return ResponseEntity.ok().body(mikroTikService.getMikroTikInfo())
+	}
+
+	@PostMapping("/delete-external-interface")
+	ResponseEntity<Object> deleteExternalInterface(@RequestBody WgInterface wgInterface) {
+		mikroTikService.deleteExternalInterface(wgInterface)
+		mikroTikService.setWgInterfaces()
+		return ResponseEntity.ok().body(mikroTikService.getMikroTikInfo())
+	}
+
+	@PostMapping("/create-new-interface")
+	ResponseEntity<Object> createNewWgInterface(@RequestBody NewWireguardInterface wgInterface) {
+		mikroTikService.createNewWgInterface(wgInterface)
+		mikroTikService.setWgInterfaces()
+		return ResponseEntity.ok().body(mikroTikService.getMikroTikInfo())
 	}
 }

@@ -3,7 +3,7 @@ package ru.unlimmitted.mtwgeasy.dto
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties
 
 @JsonIgnoreProperties(ignoreUnknown = true)
-class MtSettings {
+class MikroTikSettings {
 	String inputWgInterfaceName = "WGMTEasyIn"
 	String externalWgInterfaceName = "WGMTEasyOut"
 	String toVpnAddressList = "WGMTEasyToVpnAddresses"

@@ -1,6 +1,6 @@
 package ru.unlimmitted.mtwgeasy.dto
 
-class MtInfo {
+class MikroTikInfo {
 	String routerBoard
 	String version
 	List<WgInterface> interfaces

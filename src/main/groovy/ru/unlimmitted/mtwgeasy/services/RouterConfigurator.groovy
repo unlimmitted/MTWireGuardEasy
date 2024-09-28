@@ -1,15 +1,13 @@
 package ru.unlimmitted.mtwgeasy.services
 
 import com.fasterxml.jackson.databind.ObjectMapper
-import org.whispersystems.curve25519.Curve25519
-import org.whispersystems.curve25519.Curve25519KeyPair
-import ru.unlimmitted.mtwgeasy.dto.MtSettings
+import ru.unlimmitted.mtwgeasy.dto.MikroTikSettings
 
 class RouterConfigurator extends MikroTikExecutor {
 
-	private final MtSettings routerSettings
+	private final MikroTikSettings routerSettings
 
-	RouterConfigurator(MtSettings routerSettings) {
+	RouterConfigurator(MikroTikSettings routerSettings) {
 		super()
 		this.routerSettings = routerSettings
 	}
@@ -56,18 +54,18 @@ class RouterConfigurator extends MikroTikExecutor {
 
 	private void createIpRule() {
 		String wgAddress = routerSettings.inputWgAddress.split("/").first()
-		def query = """
-				|/ip/address/add
-				|address=${wgAddress}/24
-				|interface=${routerSettings.inputWgInterfaceName}
-				""".stripMargin().replace("\n", " ")
+		String query = """
+			|/ip/address/add
+			|address=${wgAddress}/24
+			|interface=${routerSettings.inputWgInterfaceName}
+			""".stripMargin().replace("\n", " ")
 		executeCommand(query)
 		if (routerSettings.vpnChainMode) {
 			query = """
-					|/ip/address/add
-					|address=${routerSettings.ipAddress.split("/").first()}/24
-					|interface=${routerSettings.externalWgInterfaceName}
-					""".stripMargin().replace("\n", " ")
+				|/ip/address/add
+				|address=${routerSettings.ipAddress.split("/").first()}/24
+				|interface=${routerSettings.externalWgInterfaceName}
+				""".stripMargin().replace("\n", " ")
 			executeCommand(query)
 
 			wgAddress += "/24"

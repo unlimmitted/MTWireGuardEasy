@@ -19,7 +19,7 @@ class SchedulerService {
 	@Scheduled(cron = "0 * * * * *")
 	void sendInterfaces() {
 		if (mikroTikService.isConfigured) {
-			webSocketService.sendInterfaces(mikroTikService.getMtInfo())
+			webSocketService.sendInterfaces(mikroTikService.getMikroTikInfo())
 		}
 	}
 

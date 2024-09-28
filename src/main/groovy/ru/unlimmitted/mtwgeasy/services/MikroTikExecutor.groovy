@@ -2,7 +2,7 @@ package ru.unlimmitted.mtwgeasy.services
 
 import com.fasterxml.jackson.databind.ObjectMapper
 import me.legrange.mikrotik.ApiConnection
-import ru.unlimmitted.mtwgeasy.dto.MtSettings
+import ru.unlimmitted.mtwgeasy.dto.MikroTikSettings
 
 
 import ru.unlimmitted.mtwgeasy.dto.WgInterface
@@ -13,7 +13,7 @@ import java.util.regex.Pattern
 class MikroTikExecutor {
 
 	ApiConnection connect
-	MtSettings settings
+	MikroTikSettings settings
 	List<WgInterface> wgInterfaces
 
 	final String mikrotikGateway = System.getenv("GATEWAY")
@@ -61,7 +61,7 @@ class MikroTikExecutor {
 		settings = readSettings()
 	}
 
-	private MtSettings readSettings() {
+	private MikroTikSettings readSettings() {
 		ObjectMapper objectMapper = new ObjectMapper()
 		if (isSettings()) {
 			return objectMapper.readValue(
@@ -69,10 +69,10 @@ class MikroTikExecutor {
 							.contents
 							.first
 							.replace("\\\"", "\""),
-					MtSettings.class
+					MikroTikSettings.class
 			)
 		} else {
-			MtSettings mtSettings = new MtSettings()
+			MikroTikSettings mtSettings = new MikroTikSettings()
 			return mtSettings
 		}
 	}

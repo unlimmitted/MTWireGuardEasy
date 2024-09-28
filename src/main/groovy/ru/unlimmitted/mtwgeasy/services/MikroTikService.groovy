@@ -15,7 +15,7 @@ class MikroTikService extends MikroTikExecutor {
 		super()
 	}
 
-	static void runConfigurator(MtSettings settings) {
+	static void runConfigurator(MikroTikSettings settings) {
 		new RouterConfigurator(settings).run()
 	}
 
@@ -104,8 +104,8 @@ class MikroTikService extends MikroTikExecutor {
 		})
 	}
 
-	MtInfo getMtInfo() {
-		MtInfo mtInfo = new MtInfo()
+	MikroTikInfo getMikroTikInfo() {
+		MikroTikInfo mtInfo = new MikroTikInfo()
 		if (wgInterfaces == null) {
 			setWgInterfaces()
 		}
@@ -161,5 +161,48 @@ class MikroTikService extends MikroTikExecutor {
 	void changeVpnRouting (WgInterface wgInterface) {
 		String id = executeCommand('/ip/route/print where comment="WGMTEasy"')[".id"].first()
 		executeCommand("/ip/route/set gateway=\"${wgInterface.name}\" numbers=${id}")
+	}
+
+	void setInterfaceStatus(WgInterface wgInterface) {
+		String query = "/interface/wireguard/${wgInterface.disabled ? 'enable' : 'disable'} numbers=\"${wgInterface.name}\""
+		executeCommand(query)
+	}
+
+	void deleteExternalInterface(WgInterface wgInterface) {
+		try {
+			String id = executeCommand(
+					"/interface/wireguard/peer/print where interface=\"${wgInterface.name}\""
+			)[".id"].first
+			executeCommand("/interface/wireguard/peer/remove numbers=\"${id}\"")
+			executeCommand("/interface/wireguard/remove numbers=\"${wgInterface.name}\"")
+		} catch (Exception ex) {
+			System.out.println("Fail delete peer: $ex")
+		}
+	}
+
+	void createNewWgInterface(NewWireguardInterface wgInterface) {
+		String interfaceQuery = """
+			|/interface/wireguard/add name="${wgInterface.name}"
+			|mtu=1400
+			|listen-port=${wgInterface.endpointPort}
+			|private-key="${wgInterface.privateKey}"
+			""".stripMargin().replace("\n", " ")
+		executeCommand(interfaceQuery)
+		String peerQuery = """
+			|/interface/wireguard/peers/add name="${wgInterface.name}"
+			|interface="${wgInterface.name}"
+			|public-key="${wgInterface.publicKey}"
+			|${wgInterface.presharedKey !== null ? "preshared-key='${wgInterface.presharedKey}'" : ''}
+			|endpoint-address=${wgInterface.endpoint}
+			|endpoint-port=${wgInterface.endpointPort} allowed-address="${wgInterface.allowedAddress}"
+			|persistent-keepalive=20
+			""".stripMargin().replace("\n", " ")
+		executeCommand(peerQuery)
+		String ipAddressQuery = """
+			|/ip/address/add
+			|address=${wgInterface.ipAddress.split("/").first()}/24
+			|interface=${wgInterface.name}
+			""".stripMargin().replace("\n", " ")
+		executeCommand(ipAddressQuery)
 	}
 }
