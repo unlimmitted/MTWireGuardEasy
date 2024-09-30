@@ -8,7 +8,7 @@ MikroTik system requirements:
 ## **Launch command**
 ```bash
 docker build --tag mtwgeasy . && docker run --name MTWGEasy \
- -d --no-cache -p 8080:8080 \
+ -d -p 8080:8080 \
  -e GATEWAY=<you-mikrotik-ip> \
  -e MIKROTIK_USER=<you-mikrotik-admin-login> \
  -e MIKROTIK_PASSWORD=<you-mikrotik-pass> \
