@@ -25,6 +25,7 @@ http://localhost:8080
 
 #### **VPN chain mode**
 **For the settings to appear, you need to activate the Enable Double WireGuard VPN checkbox**
+###### Added a function to import from the WireGuard .conf file
 ![photo_2024-09-23_19-18-57](https://github.com/user-attachments/assets/db1b7cfb-501a-45e3-b398-2252fd386df1)
 
 
