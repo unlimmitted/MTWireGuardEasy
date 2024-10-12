@@ -3,7 +3,6 @@ package ru.unlimmitted.mtwgeasy.services
 import com.fasterxml.jackson.databind.ObjectMapper
 import me.legrange.mikrotik.ApiConnection
 import me.legrange.mikrotik.MikrotikApiException
-import ru.unlimmitted.mtwgeasy.dto.MtSettings
 import ru.unlimmitted.mtwgeasy.dto.MikroTikSettings
 import ru.unlimmitted.mtwgeasy.dto.WgInterface
 
@@ -15,9 +14,11 @@ class MikroTikExecutor {
 	ApiConnection connect
 	MikroTikSettings settings
 	List<WgInterface> wgInterfaces
+	Boolean isConfigured
 
+	final static String settingsFile = "WGMTSettings.conf"
 	final String mikrotikGateway = System.getenv("GATEWAY")
-  private final String mikrotikUser = System.getenv("MIKROTIK_USER")
+  	private final String mikrotikUser = System.getenv("MIKROTIK_USER")
 	private final String mikrotikPassword = System.getenv("MIKROTIK_PASSWORD")
 
 	MikroTikExecutor() {
