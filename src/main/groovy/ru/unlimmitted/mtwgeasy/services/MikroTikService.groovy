@@ -1,6 +1,8 @@
 package ru.unlimmitted.mtwgeasy.services
 
-
+import com.fasterxml.jackson.databind.ObjectMapper
+import com.fasterxml.jackson.databind.type.CollectionType
+import me.legrange.mikrotik.ApiConnection
 import org.springframework.stereotype.Service
 import org.whispersystems.curve25519.Curve25519
 import org.whispersystems.curve25519.Curve25519KeyPair
@@ -11,6 +13,7 @@ import java.util.regex.Matcher
 @Service
 class MikroTikService extends MikroTikExecutor {
 
+private static final String trafficRateFileName = "traffic_rate.txt"
 	MikroTikService() {
 		super()
 	}
@@ -158,6 +161,47 @@ class MikroTikService extends MikroTikExecutor {
 		executeCommand("/ip/firewall/address-list/remove numbers=$addressListId")
 	}
 
+	void saveInterfaceTraffic() {
+		String json = executeCommand('/file/print')
+				.find { it.name == trafficRateFileName }?.contents
+		if (json != null) {
+			reconnect()
+			Integer number = executeCommand("/file/print")
+					.indexed()
+					.find { index, it -> it.name == trafficRateFileName }
+					.key
+			executeCommand("/file/remove numbers=$number")
+		} else {
+			json = "[]"
+		}
+		Long sumOfTx = getMtInfo().interfaces.find { it.name == settings.inputWgInterfaceName }.txByte.toLong() as Long
+		Long sumOfRx = getMtInfo().interfaces.find { it.name == settings.inputWgInterfaceName }.rxByte.toLong() as Long
+		TrafficRate rate = new TrafficRate(sumOfTx, sumOfRx, Instant.now())
+		ObjectMapper mapper = new ObjectMapper()
+		CollectionType type = mapper.getTypeFactory().constructCollectionType(List.class, TrafficRate.class)
+		List<TrafficRate> rates = (mapper.readValue(json, type) as List<TrafficRate>)
+				.findAll {
+					Instant.ofEpochSecond(it.time) > Instant.now().minus(1, ChronoUnit.HOURS)
+				}
+		rates.add(rate)
+		json = mapper.writeValueAsString(rates)
+		executeCommand("/file/add name=\"${trafficRateFileName}\" contents='${json}'")
+	}
+
+	List<TrafficRate> getTrafficByMinutes() {
+		def json = executeCommand('/file/print')
+				.find { it.name == trafficRateFileName }
+				?.contents
+		ObjectMapper mapper = new ObjectMapper()
+		List<TrafficRate> rates = mapper.readValue(json, mapper.getTypeFactory().constructCollectionType(List.class, TrafficRate.class))
+		return LongStream.range(1, rates.size())
+				.collect { i ->
+					new TrafficRate(
+							(rates[i].tx - rates[i - 1].tx) / 1_048_576 as Long,
+							(rates[i].rx - rates[i - 1].rx) / 1_048_576 as Long,
+							Instant.ofEpochSecond(rates[i].time)
+					)
+				}.toList()
 	void changeVpnRouting (WgInterface wgInterface) {
 		String id = executeCommand('/ip/route/print where comment="WGMTEasy"')[".id"].first()
 		executeCommand("/ip/route/set gateway=\"${wgInterface.name}\" numbers=${id}")
