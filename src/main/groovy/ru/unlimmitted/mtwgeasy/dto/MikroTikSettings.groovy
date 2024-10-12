@@ -1,6 +1,9 @@
 package ru.unlimmitted.mtwgeasy.dto
 
-class MtSettings {
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties
+
+@JsonIgnoreProperties(ignoreUnknown = true)
+class MikroTikSettings {
 	String inputWgInterfaceName = "WGMTEasyIn"
 	String externalWgInterfaceName = "WGMTEasyOut"
 	String toVpnAddressList = "WGMTEasyToVpnAddresses"

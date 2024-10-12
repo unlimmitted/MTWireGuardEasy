@@ -1,13 +1,13 @@
 package ru.unlimmitted.mtwgeasy.dto
 
 class WgInterface {
-	Boolean running
-	String privateKey
 	String name
+	String listenPort
 	String publicKey
 	Boolean disabled
-	String listenPort
+	String privateKey
 	String mtu
 	String rxByte
 	String txByte
+	Boolean isRouting = false
 }

@@ -14,6 +14,7 @@ java {
 }
 
 repositories {
+	mavenLocal()
 	mavenCentral()
 }
 
@@ -25,19 +26,22 @@ dependencies {
 	implementation 'org.springframework.boot:spring-boot-starter-websocket'
 	implementation 'org.webjars:sockjs-client:1.0.2'
 	implementation 'org.webjars:stomp-websocket:2.3.3'
+	testImplementation 'junit:junit:4.13.1'
 	compileOnly 'org.projectlombok:lombok'
 	testCompileOnly 'org.projectlombok:lombok:1.18.32'
 	testAnnotationProcessor 'org.projectlombok:lombok:1.18.32'
 	testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
 	implementation 'org.bouncycastle:bcprov-jdk15on:1.70'
 
-	implementation 'me.legrange:mikrotik:3.0.7'
+//	implementation 'me.legrange:mikrotik:3.0.7'
 
 	implementation 'org.springframework.boot:spring-boot-starter-thymeleaf'
 
 	implementation 'org.springframework.boot:spring-boot-starter-security'
 
 	implementation group: 'org.whispersystems', name: 'curve25519-java', version: '0.5.0'
+
+	implementation files('libs/mikrotik-3.0.5.jar')
 }
 
 tasks.named('test') {

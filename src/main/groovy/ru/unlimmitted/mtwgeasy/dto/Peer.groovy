@@ -14,7 +14,6 @@ class Peer {
 	String currentEndpointAddress
 	String currentEndpointPort
 	String lastHandshake
-	String comment
 	String privateKey
 	Boolean doubleVpn
 }

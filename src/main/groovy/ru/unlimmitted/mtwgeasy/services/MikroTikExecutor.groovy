@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.ObjectMapper
 import me.legrange.mikrotik.ApiConnection
 import me.legrange.mikrotik.MikrotikApiException
 import ru.unlimmitted.mtwgeasy.dto.MtSettings
+import ru.unlimmitted.mtwgeasy.dto.MikroTikSettings
 import ru.unlimmitted.mtwgeasy.dto.WgInterface
 
 import java.util.regex.Matcher
@@ -12,11 +13,11 @@ import java.util.regex.Pattern
 class MikroTikExecutor {
 
 	ApiConnection connect
-	MtSettings settings
+	MikroTikSettings settings
 	List<WgInterface> wgInterfaces
 
 	final String mikrotikGateway = System.getenv("GATEWAY")
-	private final String mikrotikUser = System.getenv("MIKROTIK_USER")
+  private final String mikrotikUser = System.getenv("MIKROTIK_USER")
 	private final String mikrotikPassword = System.getenv("MIKROTIK_PASSWORD")
 
 	MikroTikExecutor() {
@@ -59,10 +60,14 @@ class MikroTikExecutor {
 		try {
 			connect = ApiConnection.connect(mikrotikGateway)
 			connect.login(mikrotikUser, mikrotikPassword)
-			wgInterfaces = getInterfaces()
-			settings = readSettings()
+			connect.setTimeout(5_000)
+			setIsConfigured()
+			if (isConfigured) {
+				setSettings()
+				setWgInterfaces()
+			}
 		} catch (Exception e) {
-			throw new RuntimeException("Failed to connect to MikroTik: ${e.message}", e)
+      throw new RuntimeException("Failed to connect to MikroTik: ${e.message}", e)
 		}
 	}
 
@@ -74,36 +79,56 @@ class MikroTikExecutor {
 		}
 	}
 
-	private MtSettings readSettings() {
+	void setIsConfigured() {
+		isConfigured = isSettings()
+	}
+
+	void setWgInterfaces() {
+		wgInterfaces = getInterfaces()
+	}
+
+	void setSettings() {
+		settings = readSettings()
+	}
+
+	private MikroTikSettings readSettings() {
 		ObjectMapper objectMapper = new ObjectMapper()
 		if (isSettings()) {
 			return objectMapper.readValue(
-					executeCommand('/file/print').find {
-						it.name == 'WGMTSettings.conf'
-					}.contents.replace("\\\"", "\""),
-					MtSettings.class
+					executeCommand("/file/print where name=\"${settingsFile}\"")
+							.contents
+							.first
+							.replace("\\\"", "\""),
+					MikroTikSettings.class
 			)
 		} else {
-			MtSettings mtSettings = new MtSettings()
+			MikroTikSettings mtSettings = new MikroTikSettings()
 			return mtSettings
 		}
 	}
+
 
 	private List<WgInterface> getInterfaces() {
 		return executeCommand('/interface/wireguard/print').collect {
 			WgInterface wgInterface = new WgInterface()
 			wgInterface.name = it.get('name')
-			wgInterface.running = it.get('running').toBoolean()
 			wgInterface.privateKey = it.get('private-key')
 			wgInterface.publicKey = it.get('public-key')
-			wgInterface.disabled = it.get('disabled').toBoolean()
 			wgInterface.listenPort = it.get('listen-port')
 			wgInterface.mtu = it.get('mtu')
-			Map<String, String> intStats = executeCommand("/interface/print stats where name=${wgInterface.name}").first()
+			wgInterface.disabled = it.get('disabled').toBoolean()
+			Map<String, String> intStats = executeCommand(
+					"/interface/print stats where name=${wgInterface.name}"
+			).first()
 			wgInterface.rxByte = intStats.get("rx-byte")
 			wgInterface.txByte = intStats.get("tx-byte")
+			if (it.get("name") !== settings.inputWgInterfaceName) {
+				wgInterface.isRouting = executeCommand(
+						"/ip/route/print where comment=\"WGMTEasy\""
+				).gateway.first == it.get("name")
+			}
 			return wgInterface
+
 		}
 	}
-
 }

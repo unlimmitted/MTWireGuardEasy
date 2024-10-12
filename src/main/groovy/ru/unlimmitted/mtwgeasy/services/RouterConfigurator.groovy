@@ -1,19 +1,15 @@
 package ru.unlimmitted.mtwgeasy.services
 
 import com.fasterxml.jackson.databind.ObjectMapper
-import org.whispersystems.curve25519.Curve25519
-import org.whispersystems.curve25519.Curve25519KeyPair
-import ru.unlimmitted.mtwgeasy.dto.MtSettings
+import ru.unlimmitted.mtwgeasy.dto.MikroTikSettings
 
 class RouterConfigurator extends MikroTikExecutor {
 
-	private final MtSettings routerSettings
+	private final MikroTikSettings routerSettings
 
-	RouterConfigurator(MtSettings routerSettings) {
+	RouterConfigurator(MikroTikSettings routerSettings) {
 		super()
-		connect = super.connect
 		this.routerSettings = routerSettings
-		wgInterfaces = super.wgInterfaces
 	}
 
 	private void createBackup() {
@@ -33,6 +29,7 @@ class RouterConfigurator extends MikroTikExecutor {
 					|/interface/wireguard/add name="${routerSettings.externalWgInterfaceName}" 
 					|mtu=1400
 					|listen-port=${routerSettings.endpointPort}
+					|private-key="${routerSettings.externalWgPrivateKey}"
 					""".stripMargin().replace("\n", " ")
 			executeCommand(query)
 		}
@@ -42,27 +39,10 @@ class RouterConfigurator extends MikroTikExecutor {
 		String query = """
 				|/interface/wireguard/peers/add name="ExternalWG"
 				|interface="${routerSettings.externalWgInterfaceName}"
-				|public-key="${routerSettings.externalWgPublicKey}
-				|preshared-key="${routerSettings.externalWgPresharedKey}" 
+				|public-key="${routerSettings.externalWgPublicKey}"
+				|${routerSettings.externalWgPresharedKey !== null ? "preshared-key='${routerSettings.externalWgPresharedKey}'" : ''}
 				|endpoint-address=${routerSettings.endpoint}
 				|endpoint-port=${routerSettings.endpointPort} allowed-address="${routerSettings.allowedAddress}"
-				|persistent-keepalive=20
-				""".stripMargin().replace("\n", " ")
-		executeCommand(query)
-	}
-
-	private void createInteriorPeer() {
-		Curve25519KeyPair keyPair = Curve25519.getInstance(Curve25519.JAVA).generateKeyPair()
-		String pubKey = Base64.getEncoder().encodeToString(keyPair.getPublicKey())
-		String ipAddress = routerSettings.inputWgAddress.split("\\.").last()
-		String mask = ipAddress.split("/").last()
-		String address = routerSettings.inputWgAddress.replace(ipAddress, "${getHostNumber()}/${mask}")
-		String query = """
-				|/interface/wireguard/peers/add 
-				|interface="${routerSettings.inputWgInterfaceName}"
-				|public-key="${pubKey}" 
-				|allowed-address=${address}
-				|name="InteriorWG"
 				|persistent-keepalive=20
 				""".stripMargin().replace("\n", " ")
 		executeCommand(query)
@@ -74,18 +54,18 @@ class RouterConfigurator extends MikroTikExecutor {
 
 	private void createIpRule() {
 		String wgAddress = routerSettings.inputWgAddress.split("/").first()
-		def query = """
-				|/ip/address/add
-				|address=${wgAddress}/24
-				|interface=${routerSettings.inputWgInterfaceName}
-				""".stripMargin().replace("\n", " ")
+		String query = """
+			|/ip/address/add
+			|address=${wgAddress}/24
+			|interface=${routerSettings.inputWgInterfaceName}
+			""".stripMargin().replace("\n", " ")
 		executeCommand(query)
 		if (routerSettings.vpnChainMode) {
 			query = """
-					|/ip/address/add
-					|address=${routerSettings.ipAddress.split("/").first()}/24
-					|interface=${routerSettings.inputWgInterfaceName}
-					""".stripMargin().replace("\n", " ")
+				|/ip/address/add
+				|address=${routerSettings.ipAddress.split("/").first()}/24
+				|interface=${routerSettings.externalWgInterfaceName}
+				""".stripMargin().replace("\n", " ")
 			executeCommand(query)
 
 			wgAddress += "/24"
@@ -104,6 +84,7 @@ class RouterConfigurator extends MikroTikExecutor {
 
 			String routesQuery = """
 					|/ip/route/add
+					|comment="WGMTEasy"
 					|distance=1
 					|dst-address=0.0.0.0/0
 					|gateway=${routerSettings.externalWgInterfaceName}
@@ -119,12 +100,13 @@ class RouterConfigurator extends MikroTikExecutor {
 	private void saveSettings() {
 		ObjectMapper mapper = new ObjectMapper()
 		String res = mapper.writeValueAsString(routerSettings).replace("\"", "\\\"")
-		executeCommand("/file/add name=\"WGMTSettings.conf\" contents='${res}'")
+		executeCommand("/file/add name=\"${settingsFile}\" contents='${res}'")
+		setSettings()
 	}
 
 	private void createPortForwardRule() {
 		String forwardQuery = """
-				|/ip/firewall/nat
+				|/ip/firewall/nat/add
 				|comment="WGMTEasyFWD"
 				|action=dst-nat
 				|chain=dstnat
@@ -134,26 +116,33 @@ class RouterConfigurator extends MikroTikExecutor {
 				|to-addresses=${mikrotikGateway}
 		""".stripMargin().replace("\n", " ")
 		executeCommand(forwardQuery)
-		String masqueradeQuery = """
-				|/ip/firewall/nat
+		if (routerSettings.vpnChainMode) {
+			String masqueradeQuery = """
+				|/ip/firewall/nat/add
 				|comment="WGMTEasyFWD"
 				|action=masquerade
 				|chain=srcnat
 				|out-interface=${routerSettings.externalWgInterfaceName}
-		""".stripMargin().replace("\n", " ")
-		executeCommand(masqueradeQuery)
+			""".stripMargin().replace("\n", " ")
+			executeCommand(masqueradeQuery)
+		}
 	}
 
 	void run() {
-		createBackup()
-		createInterfaces()
-		createInteriorPeer()
-		if (routerSettings.vpnChainMode) {
-			createExternalPeer()
+		try {
+			createBackup()
+			createInterfaces()
+			if (routerSettings.vpnChainMode) {
+				createExternalPeer()
+			}
+			setWgInterfaces()
+			createRoutingTable()
+			createIpRule()
+			saveSettings()
+			createPortForwardRule()
+			setIsConfigured()
+		} catch (Exception ex) {
+			throw new RuntimeException("Configuration error: ${ex.message}", ex)
 		}
-		createRoutingTable()
-		createIpRule()
-		saveSettings()
-		createPortForwardRule()
 	}
 }
