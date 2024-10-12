@@ -2,6 +2,7 @@ package ru.unlimmitted.mtwgeasy.services
 
 import com.fasterxml.jackson.databind.ObjectMapper
 import me.legrange.mikrotik.ApiConnection
+import me.legrange.mikrotik.MikrotikApiException
 import ru.unlimmitted.mtwgeasy.dto.MtSettings
 import ru.unlimmitted.mtwgeasy.dto.WgInterface
 
@@ -14,14 +15,44 @@ class MikroTikExecutor {
 	MtSettings settings
 	List<WgInterface> wgInterfaces
 
-	String mikrotikGateway = System.getenv("GATEWAY")
-
-	String mikrotikUser = System.getenv("MIKROTIK_USER")
-
-	String mikrotikPassword = System.getenv("MIKROTIK_PASSWORD")
+	final String mikrotikGateway = System.getenv("GATEWAY")
+	private final String mikrotikUser = System.getenv("MIKROTIK_USER")
+	private final String mikrotikPassword = System.getenv("MIKROTIK_PASSWORD")
 
 	MikroTikExecutor() {
 		initializeConnection()
+	}
+
+	List<Map<String, String>> executeCommand(String command) {
+		try {
+			return connect.execute(command)
+		} catch (MikrotikApiException e) {
+			if (e.message != null && e.message.contains("timed out")) {
+				reconnect()
+				return executeCommand(command)
+			} else {
+				throw new RuntimeException("Failed to execute command: $command: ${e.message}", e)
+			}
+		} catch (Exception e) {
+			throw new RuntimeException("Unknown exception", e)
+		}
+	}
+
+	Integer getHostNumber() {
+		List<Integer> results = new ArrayList<>()
+		executeCommand("/interface/wireguard/peers/print").forEach {
+			String regex = "(?:\\d+\\.){3}(\\d{1,3})/\\d+"
+			Pattern pattern = Pattern.compile(regex)
+			Matcher matcher = pattern.matcher(it.get('allowed-address'))
+			if (matcher.find()) {
+				results.add(matcher.group(1).toInteger())
+			}
+		}
+		return results.size() > 0 ? results.max() + 1 : 1
+	}
+
+	Boolean isSettings() {
+		return executeCommand('/file/print').find { it.name == 'WGMTSettings.conf' }
 	}
 
 	protected void initializeConnection() {
@@ -31,7 +62,15 @@ class MikroTikExecutor {
 			wgInterfaces = getInterfaces()
 			settings = readSettings()
 		} catch (Exception e) {
-			throw new RuntimeException("Failed to connect to MikroTik", e)
+			throw new RuntimeException("Failed to connect to MikroTik: ${e.message}", e)
+		}
+	}
+
+	protected void reconnect() {
+		try {
+			initializeConnection()
+		} catch (Exception e) {
+			throw new RuntimeException("Reconnection failed: ${e.message}", e)
 		}
 	}
 
@@ -48,10 +87,6 @@ class MikroTikExecutor {
 			MtSettings mtSettings = new MtSettings()
 			return mtSettings
 		}
-	}
-
-	Boolean isSettings() {
-		return executeCommand('/file/print').find { it.name == 'WGMTSettings.conf' }
 	}
 
 	private List<WgInterface> getInterfaces() {
@@ -71,37 +106,4 @@ class MikroTikExecutor {
 		}
 	}
 
-	private void reconnect() {
-		try {
-			initializeConnection()
-		} catch (Exception e) {
-			throw new RuntimeException("Reconnection failed: ${e.message}", e)
-		}
-	}
-
-	List<Map<String, String>> executeCommand(String command) {
-		try {
-			return connect.execute(command)
-		} catch (Exception e) {
-			if (e.message.contains("timed out")) {
-				reconnect()
-				return executeCommand(command)
-			} else {
-				throw new RuntimeException("Failed to execute command: $command: ${e.message}", e)
-			}
-		}
-	}
-
-	Integer getHostNumber() {
-		List<Integer> results = new ArrayList<>()
-		executeCommand("/interface/wireguard/peers/print").forEach {
-			String regex = "(?:\\d+\\.){3}(\\d{1,3})\\/\\d+"
-			Pattern pattern = Pattern.compile(regex)
-			Matcher matcher = pattern.matcher(it.get('allowed-address'))
-			if (matcher.find()) {
-				results.add(matcher.group(1).toInteger())
-			}
-		}
-		return results.size() > 0 ? results.max() + 1 : 1
-	}
 }

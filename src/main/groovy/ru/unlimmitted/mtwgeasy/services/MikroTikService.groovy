@@ -1,6 +1,7 @@
 package ru.unlimmitted.mtwgeasy.services
 
 import com.fasterxml.jackson.databind.ObjectMapper
+import com.fasterxml.jackson.databind.type.CollectionType
 import me.legrange.mikrotik.ApiConnection
 import org.springframework.stereotype.Service
 import org.whispersystems.curve25519.Curve25519
@@ -15,21 +16,14 @@ import java.util.stream.LongStream
 @Service
 class MikroTikService extends MikroTikExecutor {
 
-	private ApiConnection connect
-	private MtSettings settings
-	private List<WgInterface> wgInterfaces
-
 	private static final String trafficRateFileName = "traffic_rate.txt"
 
 	MikroTikService() {
 		super()
-		connect = super.connect
-		wgInterfaces = super.wgInterfaces
 	}
 
 	static void runConfigurator(MtSettings settings) {
-		RouterConfigurator routerConfigurator = new RouterConfigurator(settings)
-		routerConfigurator.run()
+		new RouterConfigurator(settings).run()
 	}
 
 	List<Peer> getPeers() {
@@ -149,20 +143,22 @@ class MikroTikService extends MikroTikExecutor {
 	void saveInterfaceTraffic() {
 		String json = executeCommand('/file/print')
 				.find { it.name == trafficRateFileName }?.contents
-				?: "[]"
-		if (json != "[]") {
-			initializeConnection()
+		if (json != null) {
+			reconnect()
 			Integer number = executeCommand("/file/print")
 					.indexed()
 					.find { index, it -> it.name == trafficRateFileName }
 					.key
 			executeCommand("/file/remove numbers=$number")
+		} else {
+			json = "[]"
 		}
-		Long sumOfTx = getMtInfo().interfaces.sum { it.txByte.toLong() } as Long
-		Long sumOfRx = getMtInfo().interfaces.sum { it.rxByte.toLong() } as Long
+		Long sumOfTx = getMtInfo().interfaces.find { it.name == settings.inputWgInterfaceName }.txByte.toLong() as Long
+		Long sumOfRx = getMtInfo().interfaces.find { it.name == settings.inputWgInterfaceName }.rxByte.toLong() as Long
 		TrafficRate rate = new TrafficRate(sumOfTx, sumOfRx, Instant.now())
 		ObjectMapper mapper = new ObjectMapper()
-		List<TrafficRate> rates = (mapper.readValue(json, mapper.getTypeFactory().constructCollectionType(List.class, TrafficRate.class)) as List<TrafficRate>)
+		CollectionType type = mapper.getTypeFactory().constructCollectionType(List.class, TrafficRate.class)
+		List<TrafficRate> rates = (mapper.readValue(json, type) as List<TrafficRate>)
 				.findAll {
 					Instant.ofEpochSecond(it.time) > Instant.now().minus(1, ChronoUnit.HOURS)
 				}
@@ -178,14 +174,13 @@ class MikroTikService extends MikroTikExecutor {
 		ObjectMapper mapper = new ObjectMapper()
 		List<TrafficRate> rates = mapper.readValue(json, mapper.getTypeFactory().constructCollectionType(List.class, TrafficRate.class))
 		return LongStream.range(1, rates.size())
-				.mapToObj { i ->
+				.collect { i ->
 					new TrafficRate(
 							(rates[i].tx - rates[i - 1].tx) / 1_048_576 as Long,
 							(rates[i].rx - rates[i - 1].rx) / 1_048_576 as Long,
 							Instant.ofEpochSecond(rates[i].time)
 					)
-				}
-				.toList()
+				}.toList()
 	}
 
 }
