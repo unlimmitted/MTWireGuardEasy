@@ -18,7 +18,7 @@ class MikroTikExecutor {
 
 	final static String settingsFile = "WGMTSettings.conf"
 	final String mikrotikGateway = System.getenv("GATEWAY")
-  	private final String mikrotikUser = System.getenv("MIKROTIK_USER")
+	private final String mikrotikUser = System.getenv("MIKROTIK_USER")
 	private final String mikrotikPassword = System.getenv("MIKROTIK_PASSWORD")
 
 	MikroTikExecutor() {
@@ -68,7 +68,7 @@ class MikroTikExecutor {
 				setWgInterfaces()
 			}
 		} catch (Exception e) {
-      throw new RuntimeException("Failed to connect to MikroTik: ${e.message}", e)
+			throw new RuntimeException("Failed to connect to MikroTik: ${e.message}", e)
 		}
 	}
 
@@ -124,8 +124,9 @@ class MikroTikExecutor {
 			wgInterface.rxByte = intStats.get("rx-byte")
 			wgInterface.txByte = intStats.get("tx-byte")
 			if (it.get("name") !== settings.inputWgInterfaceName) {
+				String ipRouteName = System.getenv("IP_ROUTE_NAME") ?: "WGMTEasy"
 				wgInterface.isRouting = executeCommand(
-						"/ip/route/print where comment=\"WGMTEasy\""
+						"/ip/route/print where comment=\"${ipRouteName}\""
 				).gateway.first == it.get("name")
 			}
 			return wgInterface
