@@ -48,15 +48,20 @@ class MikroTikFiles extends MikroTikExecutor {
 				.find { it.name == trafficRateFileName }
 				?.contents
 		ObjectMapper mapper = new ObjectMapper()
-		List<TrafficRate> rates = mapper.readValue(json, mapper.getTypeFactory().constructCollectionType(List.class, TrafficRate.class))
-		return LongStream.range(1, rates.size())
-				.collect { i ->
-					new TrafficRate(
-							(rates[i].tx - rates[i - 1].tx) / 1_048_576 as Long,
-							(rates[i].rx - rates[i - 1].rx) / 1_048_576 as Long,
-							Instant.ofEpochSecond(rates[i].time)
-					)
-				}.toList()
+		try {
+			List<TrafficRate> rates = mapper.readValue(json, mapper.getTypeFactory().constructCollectionType(List.class, TrafficRate.class))
+			return LongStream.range(1, rates.size())
+					.collect { i ->
+						new TrafficRate(
+								(rates[i].tx - rates[i - 1].tx) / 1_048_576 as Long,
+								(rates[i].rx - rates[i - 1].rx) / 1_048_576 as Long,
+								Instant.ofEpochSecond(rates[i].time)
+						)
+					}.toList()
+		} catch (IllegalArgumentException exp) {
+			System.out.println("Failed parse traffic rate: $exp")
+			List<TrafficRate> rates = new ArrayList<>()
+			return rates
+		}
 	}
-
 }

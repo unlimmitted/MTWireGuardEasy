@@ -29,7 +29,7 @@ class MikroTikExecutor {
 		try {
 			return connect.execute(command)
 		} catch (MikrotikApiException e) {
-			if (e.message != null && e.message.contains("timed out")) {
+			if (e.message?.contains("timed out")) {
 				reconnect()
 				return executeCommand(command)
 			} else {
@@ -41,11 +41,10 @@ class MikroTikExecutor {
 	}
 
 	Integer getHostNumber() {
-		List<Integer> results = new ArrayList<>()
+		List<Integer> results = []
 		executeCommand("/interface/wireguard/peers/print").forEach {
 			String regex = "(?:\\d+\\.){3}(\\d{1,3})/\\d+"
-			Pattern pattern = Pattern.compile(regex)
-			Matcher matcher = pattern.matcher(it.get('allowed-address'))
+			Matcher matcher = Pattern.compile(regex).matcher(it.get('allowed-address'))
 			if (matcher.find()) {
 				results.add(matcher.group(1).toInteger())
 			}
@@ -54,14 +53,17 @@ class MikroTikExecutor {
 	}
 
 	Boolean isSettings() {
-		return executeCommand('/file/print').find { it.name == 'WGMTSettings.conf' }
+		return executeCommand('/file/print').find { it.name == settingsFile } != null
 	}
 
 	protected void initializeConnection() {
 		try {
+			if (connect != null && connect.isConnected()) {
+				connect.close()
+			}
 			connect = ApiConnection.connect(mikrotikGateway)
 			connect.login(mikrotikUser, mikrotikPassword)
-			connect.setTimeout(5_000)
+			connect.setTimeout(1_000)
 			setIsConfigured()
 			if (isConfigured) {
 				setSettings()
@@ -73,11 +75,7 @@ class MikroTikExecutor {
 	}
 
 	protected void reconnect() {
-		try {
-			initializeConnection()
-		} catch (Exception e) {
-			throw new RuntimeException("Reconnection failed: ${e.message}", e)
-		}
+		initializeConnection()
 	}
 
 	void setIsConfigured() {
@@ -95,19 +93,13 @@ class MikroTikExecutor {
 	private MikroTikSettings readSettings() {
 		ObjectMapper objectMapper = new ObjectMapper()
 		if (isSettings()) {
-			return objectMapper.readValue(
-					executeCommand("/file/print where name=\"${settingsFile}\"")
-							.contents
-							.first
-							.replace("\\\"", "\""),
-					MikroTikSettings.class
-			)
+			String configContent = executeCommand("/file/print where name=\"${settingsFile}\"")
+					.get(0)?.get('contents')?.replace("\\\"", "\"")
+			return objectMapper.readValue(configContent, MikroTikSettings.class)
 		} else {
-			MikroTikSettings mtSettings = new MikroTikSettings()
-			return mtSettings
+			return new MikroTikSettings()
 		}
 	}
-
 
 	private List<WgInterface> getInterfaces() {
 		return executeCommand('/interface/wireguard/print').collect {
