@@ -12,6 +12,7 @@ docker build --tag mtwgeasy . && docker run --name MTWGEasy \
  -e GATEWAY=<you-mikrotik-ip> \
  -e MIKROTIK_USER=<you-mikrotik-admin-login> \
  -e MIKROTIK_PASSWORD=<you-mikrotik-pass> \
+ -e IP_ROUTE_NAME=WGMTEasy \
  mtwgeasy
 ```
 
