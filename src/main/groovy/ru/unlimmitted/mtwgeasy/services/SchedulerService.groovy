@@ -1,5 +1,7 @@
 package ru.unlimmitted.mtwgeasy.services
 
+import org.slf4j.Logger
+import org.slf4j.LoggerFactory
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.scheduling.annotation.Scheduled
 import org.springframework.stereotype.Service
@@ -7,48 +9,55 @@ import org.springframework.stereotype.Service
 @Service
 class SchedulerService {
 
-	@Autowired
-	MikroTikService mikroTikService
+    private static final Logger log = LoggerFactory.getLogger(SchedulerService.class)
 
-	@Autowired
-	WebSocketService webSocketService
+    @Autowired
+    MikroTikService mikroTikService
 
-	@Autowired
-	MikroTikFiles mikroTikFiles
+    @Autowired
+    WebSocketService webSocketService
 
-	@Scheduled(cron = "0 * * * * *")
-	void sendInterfaces() {
-		if (mikroTikService.isConfigured) {
-			webSocketService.sendInterfaces(mikroTikService.getMikroTikInfo())
-		}
-	}
+    @Autowired
+    MikroTikFiles mikroTikFiles
 
-	@Scheduled(cron = "*/25 * * * * *")
-	void sendPeers() {
-		if (mikroTikService.isConfigured) {
-			webSocketService.sendPeers(mikroTikService.getPeers())
-		}
-	}
+    @Scheduled(cron = "*/15 * * * * *")
+    void refreshAndSendInterfaces() {
+        if (!mikroTikService.isConfigured) return
+        try {
+            mikroTikService.setWgInterfaces()
+            webSocketService.sendInterfaces(mikroTikService.getMikroTikInfo())
+        } catch (Exception e) {
+            log.warn("Failed to refresh interfaces: {}", e.message)
+        }
+    }
 
-	@Scheduled(cron = "*/30 * * * * *")
-	void saveInterfaceTraffic() {
-		if (mikroTikService.isConfigured) {
-			mikroTikFiles.saveInterfaceTraffic()
-		}
-	}
+    @Scheduled(cron = "*/15 * * * * *")
+    void refreshAndSendPeers() {
+        if (!mikroTikService.isConfigured) return
+        try {
+            webSocketService.sendPeers(mikroTikService.getPeers())
+        } catch (Exception e) {
+            log.warn("Failed to refresh peers: {}", e.message)
+        }
+    }
 
-	@Scheduled(cron = "10 * * * * *")
-	void sendInterfaceTraffic() {
-		if (mikroTikService.isConfigured) {
-			webSocketService.sendTrafficInterface(mikroTikFiles.getTrafficByMinutes())
-		}
-	}
+    @Scheduled(cron = "*/30 * * * * *")
+    void saveInterfaceTraffic() {
+        if (!mikroTikService.isConfigured) return
+        try {
+            mikroTikFiles.saveInterfaceTraffic()
+        } catch (Exception e) {
+            log.warn("Failed to save traffic: {}", e.message)
+        }
+    }
 
-	@Scheduled(cron = "30 * * * * *")
-	void reconnectToMikrotik() {
-		if (mikroTikService.connect.isConnected()) {
-			mikroTikService.connect.close()
-		}
-		mikroTikService.initializeConnection()
-	}
+    @Scheduled(cron = "*/20 * * * * *")
+    void sendInterfaceTraffic() {
+        if (!mikroTikService.isConfigured) return
+        try {
+            webSocketService.sendTrafficInterface(mikroTikFiles.getTrafficByMinutes())
+        } catch (Exception e) {
+            log.warn("Failed to send traffic: {}", e.message)
+        }
+    }
 }

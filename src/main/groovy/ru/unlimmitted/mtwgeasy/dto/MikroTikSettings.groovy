@@ -22,3 +22,5 @@ class MikroTikSettings {
 	String externalWgPresharedKey
 	Boolean vpnChainMode
 }
+
+

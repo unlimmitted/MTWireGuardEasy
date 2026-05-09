@@ -18,38 +18,46 @@ repositories {
 	mavenCentral()
 }
 
+// FIX: принудительно фиксируем JPA API 3.1.0 — hibernate-community-dialects тянул 3.2.0,
+//      которая несовместима со Spring Boot 3.3.x и вызывала конфликт getSchemaManager()
+configurations.all {
+	resolutionStrategy.eachDependency { DependencyResolveDetails details ->
+		if (details.requested.group == 'jakarta.persistence'
+				&& details.requested.name == 'jakarta.persistence-api') {
+			details.useVersion '3.1.0'
+			details.because 'Spring Boot 3.3.x требует JPA API 3.1, не 3.2'
+		}
+	}
+}
+
 dependencies {
-	implementation 'org.springframework.boot:spring-boot-starter'
 	implementation 'org.apache.groovy:groovy'
+	implementation 'org.springframework.boot:spring-boot-starter'
+	// FIX: убрана явная зависимость jakarta.persistence-api:3.2.0 —
+	//      она перебивала resolutionStrategy.force и была корнем проблемы
+	implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
 	implementation 'org.springframework.boot:spring-boot-starter-web'
-	testImplementation 'org.springframework.boot:spring-boot-starter-test'
 	implementation 'org.springframework.boot:spring-boot-starter-websocket'
-	implementation 'org.webjars:sockjs-client:1.0.2'
-	implementation 'org.webjars:stomp-websocket:2.3.3'
-	testImplementation 'junit:junit:4.13.1'
-	compileOnly 'org.projectlombok:lombok'
-	testCompileOnly 'org.projectlombok:lombok:1.18.32'
-	testAnnotationProcessor 'org.projectlombok:lombok:1.18.32'
-	testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
-	implementation 'org.bouncycastle:bcprov-jdk15on:1.70'
-    // https://mvnrepository.com/artifact/org.hibernate/hibernate-core
-    implementation("org.hibernate:hibernate-core:7.1.6.Final")
-
-//	implementation 'me.legrange:mikrotik:3.0.7'
-
 	implementation 'org.springframework.boot:spring-boot-starter-thymeleaf'
-
 	implementation 'org.springframework.boot:spring-boot-starter-security'
 
+	implementation 'org.webjars:sockjs-client:1.0.2'
+	implementation 'org.webjars:stomp-websocket:2.3.3'
+
+	// FIX: lombok убран из compileOnly для Groovy-проекта — в Groovy он не работает
+	//      через annotation processor, только через compileOnly без эффекта
+
+	implementation 'org.bouncycastle:bcprov-jdk15on:1.70'
 	implementation group: 'org.whispersystems', name: 'curve25519-java', version: '0.5.0'
+
+	implementation 'org.xerial:sqlite-jdbc:3.45.1.0'
+	implementation 'org.hibernate.orm:hibernate-community-dialects:6.5.2.Final'
 
 	implementation files('libs/mikrotik-3.0.5.jar')
 
-    implementation 'org.xerial:sqlite-jdbc:3.45.3.0'
-    implementation "org.hibernate.orm:hibernate-community-dialects"
-    implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
-
-
+	testImplementation 'org.springframework.boot:spring-boot-starter-test'
+	testImplementation 'junit:junit:4.13.1'
+	testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
 }
 
 tasks.named('test') {

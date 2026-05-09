@@ -3,6 +3,8 @@ package ru.unlimmitted.mtwgeasy.services
 import com.fasterxml.jackson.databind.ObjectMapper
 import me.legrange.mikrotik.ApiConnection
 import me.legrange.mikrotik.MikrotikApiException
+import org.slf4j.Logger
+import org.slf4j.LoggerFactory
 import ru.unlimmitted.mtwgeasy.dto.MikroTikSettings
 import ru.unlimmitted.mtwgeasy.dto.WgInterface
 
@@ -11,118 +13,130 @@ import java.util.regex.Pattern
 
 class MikroTikExecutor {
 
-	ApiConnection connect
-	MikroTikSettings settings
-	List<WgInterface> wgInterfaces
-	Boolean isConfigured
+    private static final Logger log = LoggerFactory.getLogger(MikroTikExecutor.class)
+    private static final int MAX_RETRIES = 3
+    private static final int CONNECTION_TIMEOUT_MS = 5_000
 
-	final static String settingsFile = "WGMTSettings.conf"
-	final String mikrotikGateway = System.getenv("GATEWAY")
-	private final String mikrotikUser = System.getenv("MIKROTIK_USER")
-	private final String mikrotikPassword = System.getenv("MIKROTIK_PASSWORD")
+    ApiConnection connect
+    MikroTikSettings settings
+    List<WgInterface> wgInterfaces
+    Boolean isConfigured
 
-	MikroTikExecutor() {
-		initializeConnection()
-	}
+    final static String settingsFile = "WGMTSettings.conf"
+    final String mikrotikGateway = System.getenv("GATEWAY")
+    private final String mikrotikUser = System.getenv("MIKROTIK_USER")
+    private final String mikrotikPassword = System.getenv("MIKROTIK_PASSWORD")
 
-	List<Map<String, String>> executeCommand(String command) {
-		try {
-			return connect.execute(command)
-		} catch (MikrotikApiException e) {
-			if (e.message?.contains("timed out")) {
-				reconnect()
-				return executeCommand(command)
-			} else {
-				throw new RuntimeException("Failed to execute command: $command: ${e.message}", e)
-			}
-		} catch (Exception e) {
-			throw new RuntimeException("Unknown exception", e)
-		}
-	}
+    MikroTikExecutor() {
+        initializeConnection()
+    }
 
-	Integer getHostNumber() {
-		List<Integer> results = []
-		executeCommand("/interface/wireguard/peers/print").forEach {
-			String regex = "(?:\\d+\\.){3}(\\d{1,3})/\\d+"
-			Matcher matcher = Pattern.compile(regex).matcher(it.get('allowed-address'))
-			if (matcher.find()) {
-				results.add(matcher.group(1).toInteger())
-			}
-		}
-		return results.size() > 0 ? results.max() + 1 : 1
-	}
+    synchronized List<Map<String, String>> executeCommand(String command, int retries = 0) {
+        try {
+            return connect.execute(command)
+        } catch (MikrotikApiException e) {
+            if (e.message?.contains("timed out") && retries < MAX_RETRIES) {
+                log.warn("Command timed out, retrying ({}/{}}): {}", retries + 1, MAX_RETRIES, command)
+                reconnect()
+                return executeCommand(command, retries + 1)
+            } else {
+                throw new RuntimeException("Failed to execute command: $command: ${e.message}", e)
+            }
+        } catch (Exception e) {
+            throw new RuntimeException("Unknown exception executing command: $command", e)
+        }
+    }
 
-	Boolean isSettings() {
-		return executeCommand('/file/print').find { it.name == settingsFile } != null
-	}
+    Integer getHostNumber() {
+        List<Integer> results = []
+        executeCommand("/interface/wireguard/peers/print").forEach {
+            String regex = "(?:\\d+\\.){3}(\\d{1,3})/\\d+"
+            Matcher matcher = Pattern.compile(regex).matcher(it.get('allowed-address') ?: '')
+            if (matcher.find()) {
+                results.add(matcher.group(1).toInteger())
+            }
+        }
+        return results ? results.max() + 1 : 1
+    }
 
-	protected void initializeConnection() {
-		try {
-			if (connect != null && connect.isConnected()) {
-				connect.close()
-			}
-			connect = ApiConnection.connect(mikrotikGateway)
-			connect.login(mikrotikUser, mikrotikPassword)
-			connect.setTimeout(1_000)
-			setIsConfigured()
-			if (isConfigured) {
-				setSettings()
-				setWgInterfaces()
-			}
-		} catch (Exception e) {
-			throw new RuntimeException("Failed to connect to MikroTik: ${e.message}", e)
-		}
-	}
+    Boolean isSettings() {
+        return executeCommand('/file/print').find {
+            it.name == settingsFile
+        } != null
+    }
 
-	protected void reconnect() {
-		initializeConnection()
-	}
+    protected synchronized void initializeConnection() {
+        try {
+            if (connect != null && connect.isConnected()) {
+                connect.close()
+            }
+            connect = ApiConnection.connect(mikrotikGateway)
+            connect.login(mikrotikUser, mikrotikPassword)
+            connect.setTimeout(CONNECTION_TIMEOUT_MS)
+            setIsConfigured()
+            if (isConfigured) {
+                setSettings()
+                setWgInterfaces()
+            }
+        } catch (Exception e) {
+            throw new RuntimeException("Failed to connect to MikroTik: ${e.message}", e)
+        }
+    }
 
-	void setIsConfigured() {
-		isConfigured = isSettings()
-	}
+    protected synchronized void reconnect() {
+        if (connect == null || !connect.isConnected()) {
+            log.info("Reconnecting to MikroTik...")
+            initializeConnection()
+        }
+    }
 
-	void setWgInterfaces() {
-		wgInterfaces = getInterfaces()
-	}
+    void setIsConfigured() {
+        isConfigured = isSettings()
+    }
 
-	void setSettings() {
-		settings = readSettings()
-	}
+    void setWgInterfaces() {
+        wgInterfaces = getInterfaces()
+    }
 
-	private MikroTikSettings readSettings() {
-		ObjectMapper objectMapper = new ObjectMapper()
-		if (isSettings()) {
-			String configContent = executeCommand("/file/print where name=\"${settingsFile}\"")
-					.get(0)?.get('contents')?.replace("\\\"", "\"")
-			return objectMapper.readValue(configContent, MikroTikSettings.class)
-		} else {
-			return new MikroTikSettings()
-		}
-	}
+    void setSettings() {
+        settings = readSettings()
+    }
 
-	private List<WgInterface> getInterfaces() {
-		return executeCommand('/interface/wireguard/print').collect {
-			WgInterface wgInterface = new WgInterface()
-			wgInterface.name = it.get('name')
-			wgInterface.privateKey = it.get('private-key')
-			wgInterface.publicKey = it.get('public-key')
-			wgInterface.listenPort = it.get('listen-port')
-			wgInterface.mtu = it.get('mtu')
-			wgInterface.disabled = it.get('disabled').toBoolean()
-			Map<String, String> intStats = executeCommand(
-					"/interface/print stats where name=${wgInterface.name}"
-			).first()
-			wgInterface.rxByte = intStats.get("rx-byte")
-			wgInterface.txByte = intStats.get("tx-byte")
-			if (it.get("name") !== settings.inputWgInterfaceName) {
-				String ipRouteName = System.getenv("IP_ROUTE_NAME") ?: "WGMTEasy"
-				wgInterface.isRouting = executeCommand(
-						"/ip/route/print where comment=\"${ipRouteName}\""
-				).gateway.first == it.get("name")
-			}
-			return wgInterface
+    private MikroTikSettings readSettings() {
+        ObjectMapper objectMapper = new ObjectMapper()
+        if (isSettings()) {
+            String configContent = executeCommand("/file/print where name=\"${settingsFile}\"")
+                    .get(0)?.get('contents')?.replace("\\\"", "\"")
+            return objectMapper.readValue(configContent, MikroTikSettings.class)
+        } else {
+            return new MikroTikSettings()
+        }
+    }
 
-		}
-	}
+    private List<WgInterface> getInterfaces() {
+        String ipRouteName = System.getenv("IP_ROUTE_NAME") ?: "WGMTEasy"
+        List<Map<String, String>> routes = executeCommand("/ip/route/print where comment=\"${ipRouteName}\"")
+
+        return executeCommand('/interface/wireguard/print').collect {
+            WgInterface wgInterface = new WgInterface()
+            wgInterface.name = it.get('name')
+            wgInterface.privateKey = it.get('private-key')
+            wgInterface.publicKey = it.get('public-key')
+            wgInterface.listenPort = it.get('listen-port')
+            wgInterface.mtu = it.get('mtu')
+            wgInterface.disabled = it.get('disabled').toBoolean()
+
+            Map<String, String> intStats = executeCommand(
+                    "/interface/print stats where name=${wgInterface.name}"
+            ).first()
+            wgInterface.rxByte = intStats.get("rx-byte")
+            wgInterface.txByte = intStats.get("tx-byte")
+
+            if (wgInterface.name != settings.inputWgInterfaceName) {
+                wgInterface.isRouting = routes.any { route -> route.gateway == wgInterface.name }
+            }
+
+            return wgInterface
+        }
+    }
 }

@@ -1,67 +1,59 @@
 package ru.unlimmitted.mtwgeasy.services
 
-import com.fasterxml.jackson.databind.ObjectMapper
+import org.slf4j.Logger
+import org.slf4j.LoggerFactory
+import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.stereotype.Service
 import ru.unlimmitted.mtwgeasy.dto.TrafficRate
-import ru.unlimmitted.mtwgeasy.dto.WgInterface
+import ru.unlimmitted.mtwgeasy.entity.TrafficRateEntity
+import ru.unlimmitted.mtwgeasy.repository.TrafficRateRepository
 
 import java.time.Instant
 import java.time.temporal.ChronoUnit
-import java.util.stream.LongStream
 
 @Service
 class MikroTikFiles extends MikroTikExecutor {
 
-	private static final String trafficRateFileName = "traffic_rate.txt"
+    private static final Logger log = LoggerFactory.getLogger(MikroTikFiles.class)
 
-	Boolean isFileExists(String fileName) {
-		return !executeCommand("/file/print where name=\"${fileName}\"").isEmpty()
-	}
+    @Autowired
+    TrafficRateRepository trafficRateRepository
 
-	void saveInterfaceTraffic() {
-		String json = "[]"
-		if (isFileExists(trafficRateFileName)) {
-			if (connect.connected) {
-				connect.close()
-			}
-			initializeConnection()
-			json = executeCommand("/file/print where name=\"${trafficRateFileName}\"").contents.first
-			String id = executeCommand("/file/print where name=\"${trafficRateFileName}\"")['.id'].first
-			executeCommand("/file/remove numbers=$id")
-		}
-		WgInterface inputInterface = wgInterfaces.find { it.name == settings.inputWgInterfaceName }
-		Long tX = inputInterface.txByte.toLong() as Long
-		Long rX = inputInterface.rxByte.toLong() as Long
-		TrafficRate rate = new TrafficRate(tX, rX, Instant.now())
-		ObjectMapper mapper = new ObjectMapper()
-		List<TrafficRate> rates = (mapper.readValue(json, mapper.getTypeFactory().constructCollectionType(List.class, TrafficRate.class)) as List<TrafficRate>)
-				.findAll {
-					Instant.ofEpochSecond(it.time) > Instant.now().minus(1, ChronoUnit.HOURS)
-				}
-		rates.add(rate)
-		json = mapper.writeValueAsString(rates)
-		executeCommand("/file/add name=\"${trafficRateFileName}\" contents='${json}'")
-	}
+    void saveInterfaceTraffic() {
+        def inputInterface = wgInterfaces.find { it.name == settings.inputWgInterfaceName }
+        if (inputInterface == null) {
+            log.warn("Input WireGuard interface '{}' not found, skipping traffic save", settings.inputWgInterfaceName)
+            return
+        }
 
-	List<TrafficRate> getTrafficByMinutes() {
-		def json = executeCommand('/file/print')
-				.find { it.name == trafficRateFileName }
-				?.contents
-		ObjectMapper mapper = new ObjectMapper()
-		try {
-			List<TrafficRate> rates = mapper.readValue(json, mapper.getTypeFactory().constructCollectionType(List.class, TrafficRate.class))
-			return LongStream.range(1, rates.size())
-					.collect { i ->
-						new TrafficRate(
-								(rates[i].tx - rates[i - 1].tx) / 1_048_576 as Long,
-								(rates[i].rx - rates[i - 1].rx) / 1_048_576 as Long,
-								Instant.ofEpochSecond(rates[i].time)
-						)
-					}.toList()
-		} catch (IllegalArgumentException exp) {
-			System.out.println("Failed parse traffic rate: $exp")
-			List<TrafficRate> rates = new ArrayList<>()
-			return rates
-		}
-	}
+        TrafficRateEntity entity = new TrafficRateEntity(
+                tx: inputInterface.txByte.toLong(),
+                rx: inputInterface.rxByte.toLong(),
+                time: Instant.now().epochSecond
+        )
+        trafficRateRepository.save(entity)
+
+        long oneHourAgo = Instant.now().minus(1, ChronoUnit.HOURS).epochSecond
+        trafficRateRepository.deleteOlderThan(oneHourAgo)
+
+        log.debug("Traffic saved: tx={}, rx={}", entity.tx, entity.rx)
+    }
+
+    List<TrafficRate> getTrafficByMinutes() {
+        long oneHourAgo = Instant.now().minus(1, ChronoUnit.HOURS).epochSecond
+        List<TrafficRateEntity> records = trafficRateRepository.findAllSince(oneHourAgo)
+
+        if (records.size() < 2) {
+            log.debug("Not enough traffic records to calculate rate, got {}", records.size())
+            return []
+        }
+
+        return (1..<records.size()).collect { int i ->
+            new TrafficRate(
+                    Math.max(0L, (records[i].tx - records[i - 1].tx) / 1_048_576 as Long),
+                    Math.max(0L, (records[i].rx - records[i - 1].rx) / 1_048_576 as Long),
+                    Instant.ofEpochSecond(records[i].time)
+            )
+        }
+    }
 }
