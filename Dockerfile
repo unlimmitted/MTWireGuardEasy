@@ -14,5 +14,10 @@ RUN gradle bootJar
 
 FROM alpine/java:21-jdk AS java
 WORKDIR /home/java/
+RUN mkdir -p /home/java/data
+
 COPY --from=gradle /home/gradle/build/libs/*.jar /home/java/MTWGEasy.jar
+
+VOLUME /home/java/data
+
 CMD ["java", "-jar", "MTWGEasy.jar"]

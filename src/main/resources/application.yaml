@@ -3,7 +3,7 @@ spring:
     name: MTWGEasy
 
   datasource:
-    url: jdbc:sqlite:src/main/resources/db/db.sqlite
+    url: jdbc:sqlite:/home/java/data/db.sqlite
     driver-class-name: org.sqlite.JDBC
 
   jpa:
