@@ -3,10 +3,12 @@ spring:
     name: MTWGEasy
 
   datasource:
-    url: jdbc:sqlite:/home/java/data/db.sqlite
+    # IDE/local default. Docker overrides DB_PATH to its persistent volume.
+    url: jdbc:sqlite:${DB_PATH:./db.sqlite}
     driver-class-name: org.sqlite.JDBC
 
   jpa:
+    open-in-view: false
     hibernate:
       ddl-auto: update
     database-platform: org.hibernate.community.dialect.SQLiteDialect

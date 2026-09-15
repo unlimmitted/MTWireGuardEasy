@@ -18,16 +18,21 @@ class MikroTikService extends MikroTikExecutor {
         super()
     }
 
-    static void runConfigurator(MikroTikSettings settings) {
+    void runConfigurator(MikroTikSettings settings) {
         new RouterConfigurator(settings).run()
+        initializeConnection()
     }
 
     List<Peer> getPeers() {
         List<AddressList> lists = getAddressList()
+        Map<String, AddressList> routingByAddress = lists
+                .findAll { it.listName == settings?.toVpnAddressList }
+                .findAll { it.address }
+                .collectEntries { [(it.address): it] }
 
         return executeCommand("/interface/wireguard/peers/print").findAll {
             it != null &&
-            !it.get("private-key").isEmpty() &&
+            it.get("private-key") &&
             it.comment != "ExternalWG" &&
             it.comment != "InteriorWG"
         }.collect { Map<String, String> it ->
@@ -53,7 +58,7 @@ class MikroTikService extends MikroTikExecutor {
 
             String[] allowedAddressParts = it.get("allowed-address").split("/")
             if (allowedAddressParts.length > 0) {
-                AddressList addressEntry = findPeerInAddressList(lists, allowedAddressParts.first())
+                AddressList addressEntry = routingByAddress.get(allowedAddressParts.first())
                 if (addressEntry != null) {
                     peer.doubleVpn = !addressEntry.disabled
                 }
@@ -71,7 +76,7 @@ class MikroTikService extends MikroTikExecutor {
             etherInterface.macAddress = it.get("mac-address")
             etherInterface.network = executeCommand(
                     "/ip/address/print where interface=\"${it.get("name")}\""
-            ).network.first
+            ).find()?.get("network")
             interfaces.add(etherInterface)
         }
         return interfaces
@@ -103,27 +108,28 @@ class MikroTikService extends MikroTikExecutor {
         MikroTikInfo mtInfo = new MikroTikInfo()
         mtInfo.interfaces = wgInterfaces ?: []
         try {
-            executeCommand("/system/routerboard/print").forEach {
-                mtInfo.routerBoard = it.get('board-name')
-                mtInfo.version = it.get('upgrade-firmware')
-            }
+            Map<String, String> resource = executeCommand("/system/resource/print").find() ?: [:]
+            mtInfo.routerBoard = resource.get('board-name') ?: resource.get('platform') ?: "<undefined>"
+            mtInfo.version = resource.get('version') ?: "<undefined>"
         } catch (Exception e) {
-            if (e.message?.contains("no such command prefix")) {
-                mtInfo.routerBoard = "<undefined>"
-                mtInfo.version = "<undefined>"
-            } else {
-                log.warn("Failed to get routerboard info: {}", e.message)
-            }
+            mtInfo.routerBoard = "<undefined>"
+            mtInfo.version = "<undefined>"
+            log.warn("Failed to get MikroTik system info: {}", e.message)
         }
         return mtInfo
     }
 
     void createNewPeer(String peerName) {
+        peerName = requireSafeValue(peerName, "Peer name", 64)
         Curve25519KeyPair keyPair = Curve25519.getInstance(Curve25519.JAVA).generateKeyPair()
         String pri = Base64.getEncoder().encodeToString(keyPair.getPrivateKey())
         String regex = /^(\d{1,3})\.(\d{1,3})\.(\d{1,3})/
-        Matcher matcher = (settings.inputWgAddress =~ regex)
-        String ip = "${matcher[0][1..3].join(".")}.${getHostNumber()}"
+        String inputAddress = settings?.inputWgAddress
+        Matcher matcher = (inputAddress ?: "") =~ regex
+        if (!matcher.find()) {
+            throw new IllegalStateException("Input WireGuard address is not configured correctly")
+        }
+        String ip = "${matcher.group(1)}.${matcher.group(2)}.${matcher.group(3)}.${getHostNumber()}"
         String peerQueryParams = """
             |/interface/wireguard/peers/add
             |interface="${settings.inputWgInterfaceName}"
@@ -139,43 +145,61 @@ class MikroTikService extends MikroTikExecutor {
 
     void changeRouting(Peer peer) {
         List<AddressList> lists = getAddressList()
-        String listId = findPeerInAddressList(lists, peer.allowedAddress.split('/').first()).id
+        AddressList addressEntry = findPeerInAddressList(lists, peer.allowedAddress?.split('/')?.first())
+        if (addressEntry == null) {
+            throw new IllegalArgumentException("Peer routing entry was not found")
+        }
+        String listId = requireRouterOsId(addressEntry.id)
         String queryParam = "${peer.doubleVpn ? 'disable' : 'enable'} numbers=$listId"
         executeCommand("/ip/firewall/address-list/$queryParam")
     }
 
     void removePeer(Peer peer) {
-        String peerId = peer.id
+        String peerId = requireRouterOsId(peer.id)
         List<AddressList> lists = getAddressList()
-        String addressListId = findPeerInAddressList(lists, peer.allowedAddress.split('/').first()).id
+        AddressList addressEntry = findPeerInAddressList(lists, peer.allowedAddress?.split('/')?.first())
+        if (addressEntry == null) {
+            throw new IllegalArgumentException("Peer routing entry was not found")
+        }
+        String addressListId = requireRouterOsId(addressEntry.id)
         executeCommand("/interface/wireguard/peers/remove numbers=$peerId")
         executeCommand("/ip/firewall/address-list/remove numbers=$addressListId")
     }
 
     void changeVpnRouting(WgInterface wgInterface) {
-        String id = executeCommand('/ip/route/print where comment="WGMTEasy"')[".id"].first()
-        executeCommand("/ip/route/set gateway=\"${wgInterface.name}\" numbers=${id}")
+        String interfaceName = requireSafeValue(wgInterface.name, "Interface name", 64)
+        String routeComment = System.getenv("IP_ROUTE_NAME") ?: "WGMTEasy"
+        String id = executeCommand("/ip/route/print where comment=\"${routeComment}\"").find()?.get(".id")
+        if (id == null) {
+            throw new IllegalStateException("WireGuard routing entry was not found")
+        }
+        executeCommand("/ip/route/set gateway=\"${interfaceName}\" numbers=${requireRouterOsId(id)}")
     }
 
     void setInterfaceStatus(WgInterface wgInterface) {
-        String query = "/interface/wireguard/${wgInterface.disabled ? 'enable' : 'disable'} numbers=\"${wgInterface.name}\""
+        String interfaceName = requireSafeValue(wgInterface.name, "Interface name", 64)
+        String query = "/interface/wireguard/${wgInterface.disabled ? 'enable' : 'disable'} numbers=\"${interfaceName}\""
         executeCommand(query)
     }
 
     void deleteExternalInterface(WgInterface wgInterface) {
+        String interfaceName = requireSafeValue(wgInterface.name, "Interface name", 64)
         try {
             String id = executeCommand(
-                    "/interface/wireguard/peers/print where interface=\"${wgInterface.name}\""
-            )[".id"].first
-            executeCommand("/interface/wireguard/peers/remove numbers=\"${id}\"")
-            executeCommand("/interface/wireguard/remove numbers=\"${wgInterface.name}\"")
+                    "/interface/wireguard/peers/print where interface=\"${interfaceName}\""
+            ).find()?.get(".id")
+            if (id != null) {
+                executeCommand("/interface/wireguard/peers/remove numbers=\"${requireRouterOsId(id)}\"")
+            }
+            executeCommand("/interface/wireguard/remove numbers=\"${interfaceName}\"")
         } catch (Exception ex) {
-            // FIX: slf4j вместо System.out.println
             log.error("Failed to delete interface {}: {}", wgInterface.name, ex.message, ex)
+            throw ex
         }
     }
 
     void createNewWgInterface(NewWireguardInterface wgInterface) {
+        validateNewInterface(wgInterface)
         String interfaceQuery = """
             |/interface/wireguard/add name="${wgInterface.name}"
             |mtu=1400
@@ -201,5 +225,41 @@ class MikroTikService extends MikroTikExecutor {
             |interface=${wgInterface.name}
             """.stripMargin().replace("\n", " ")
         executeCommand(ipAddressQuery)
+    }
+
+    private static void validateNewInterface(NewWireguardInterface wgInterface) {
+        wgInterface.name = requireSafeValue(wgInterface.name, "Interface name", 64)
+        wgInterface.ipAddress = requireSafeValue(wgInterface.ipAddress, "IP address", 64)
+        wgInterface.allowedAddress = requireSafeValue(wgInterface.allowedAddress, "Allowed address", 255)
+        wgInterface.endpoint = requireSafeValue(wgInterface.endpoint, "Endpoint", 255)
+        wgInterface.publicKey = requireSafeValue(wgInterface.publicKey, "Public key", 128)
+        wgInterface.privateKey = requireSafeValue(wgInterface.privateKey, "Private key", 128)
+        if (wgInterface.presharedKey) {
+            wgInterface.presharedKey = requireSafeValue(wgInterface.presharedKey, "Preshared key", 128)
+        }
+        int port
+        try {
+            port = wgInterface.endpointPort?.toInteger()
+        } catch (Exception ignored) {
+            throw new IllegalArgumentException("Endpoint port must be a number")
+        }
+        if (port < 1 || port > 65535) {
+            throw new IllegalArgumentException("Endpoint port must be between 1 and 65535")
+        }
+    }
+
+    private static String requireSafeValue(String value, String field, int maxLength) {
+        String normalized = value?.trim()
+        if (!normalized || normalized.length() > maxLength || normalized.find(/[\r\n"';]/)) {
+            throw new IllegalArgumentException("${field} contains unsupported characters")
+        }
+        return normalized
+    }
+
+    private static String requireRouterOsId(String value) {
+        if (value == null || !(value ==~ /\*?[0-9A-Fa-f]+/)) {
+            throw new IllegalArgumentException("Invalid RouterOS object id")
+        }
+        return value
     }
 }

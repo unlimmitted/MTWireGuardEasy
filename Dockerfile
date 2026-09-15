@@ -15,6 +15,7 @@ RUN gradle bootJar
 FROM alpine/java:21-jdk AS java
 WORKDIR /home/java/
 RUN mkdir -p /home/java/data
+ENV DB_PATH=/home/java/data/db.sqlite
 
 COPY --from=gradle /home/gradle/build/libs/*.jar /home/java/MTWGEasy.jar
 

@@ -4,11 +4,17 @@ import jakarta.servlet.http.HttpServletResponse
 import org.springframework.http.ResponseEntity
 import org.springframework.security.core.Authentication
 import org.springframework.security.core.context.SecurityContextHolder
+import org.springframework.security.web.csrf.CsrfToken
 import org.springframework.web.bind.annotation.*
 
 @RestController
 @RequestMapping("/auth")
 class AuthController {
+
+	@GetMapping("/csrf")
+	Map<String, String> csrf(CsrfToken token) {
+		return [token: token.token]
+	}
 
 	@GetMapping("/status")
 	def getStatus(HttpServletResponse response) {
@@ -19,7 +25,7 @@ class AuthController {
 			return [authenticated: auth.authenticated, user: auth.getName()]
 		} else {
 			response.setStatus(HttpServletResponse.SC_UNAUTHORIZED)
-			return [authenticated: auth.authenticated]
+			return [authenticated: false]
 		}
 	}
 }

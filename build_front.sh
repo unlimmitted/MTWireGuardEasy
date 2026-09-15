@@ -2,7 +2,7 @@
 
 path=$(pwd)
 
-cd "../../WebstormProjects/MTWireGuardEasy-frontend/" || { cd "$path" && exit 1; }
+cd "../../MTWireGuardEasy-frontend/" || { cd "$path" && exit 1; }
 npm install
 npm run build
 

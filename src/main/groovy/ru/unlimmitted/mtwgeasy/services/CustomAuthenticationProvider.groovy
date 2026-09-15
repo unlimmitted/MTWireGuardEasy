@@ -8,6 +8,7 @@ import org.springframework.security.core.AuthenticationException
 import org.springframework.security.core.GrantedAuthority
 import org.springframework.security.core.userdetails.User
 import org.springframework.security.core.userdetails.UserDetails
+import org.springframework.security.authentication.BadCredentialsException
 import org.springframework.stereotype.Component
 
 @Component
@@ -22,12 +23,12 @@ class CustomAuthenticationProvider implements AuthenticationProvider {
 		String username = authentication.getName()
 		String password = authentication.getCredentials().toString()
 
-		if (username == envUser && password == envPassword) {
+		if (envUser && envPassword && username == envUser && password == envPassword) {
 			List<GrantedAuthority> authorities = []
-			UserDetails userDetails = new User(username, password, authorities)
-			return new UsernamePasswordAuthenticationToken(userDetails, password, authorities)
+			UserDetails userDetails = new User(username, "", authorities)
+			return new UsernamePasswordAuthenticationToken(userDetails, null, authorities)
 		} else {
-			return null
+			throw new BadCredentialsException("Invalid credentials")
 		}
 	}
 

@@ -20,6 +20,18 @@ class SchedulerService {
     @Autowired
     MikroTikFiles mikroTikFiles
 
+    @Autowired
+    PeerTrafficService peerTrafficService
+
+    @Scheduled(fixedDelay = 30_000L)
+    void restoreConnection() {
+        try {
+            mikroTikService.reconnectIfNeeded()
+        } catch (Exception e) {
+            log.debug("MikroTik is still unavailable: {}", e.message)
+        }
+    }
+
     @Scheduled(cron = "*/15 * * * * *")
     void refreshAndSendInterfaces() {
         if (!mikroTikService.isConfigured) return
@@ -35,7 +47,13 @@ class SchedulerService {
     void refreshAndSendPeers() {
         if (!mikroTikService.isConfigured) return
         try {
-            webSocketService.sendPeers(mikroTikService.getPeers())
+            def peers = mikroTikService.getPeers()
+            try {
+                peerTrafficService.saveSnapshots(peers)
+            } catch (Exception e) {
+                log.warn("Failed to save peer traffic: {}", e.message)
+            }
+            webSocketService.sendPeers(peers)
         } catch (Exception e) {
             log.warn("Failed to refresh peers: {}", e.message)
         }

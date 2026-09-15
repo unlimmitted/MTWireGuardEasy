@@ -2,7 +2,6 @@ package ru.unlimmitted.mtwgeasy.services
 
 import com.fasterxml.jackson.databind.ObjectMapper
 import me.legrange.mikrotik.ApiConnection
-import me.legrange.mikrotik.MikrotikApiException
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
 import ru.unlimmitted.mtwgeasy.dto.MikroTikSettings
@@ -31,20 +30,50 @@ class MikroTikExecutor {
         initializeConnection()
     }
 
-    synchronized List<Map<String, String>> executeCommand(String command, int retries = 0) {
-        try {
-            return connect.execute(command)
-        } catch (MikrotikApiException e) {
-            if (e.message?.contains("timed out") && retries < MAX_RETRIES) {
-                log.warn("Command timed out, retrying ({}/{}}): {}", retries + 1, MAX_RETRIES, command)
-                reconnect()
-                return executeCommand(command, retries + 1)
-            } else {
-                throw new RuntimeException("Failed to execute command: $command: ${e.message}", e)
+    synchronized List<Map<String, String>> executeCommand(String command) {
+        for (int attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+            try {
+                ensureConnected()
+                return connect.execute(command)
+            } catch (Exception e) {
+                if (!isRetryableConnectionFailure(e) || attempt == MAX_RETRIES) {
+                    throw new RuntimeException("MikroTik command failed: ${e.message}", e)
+                }
+                log.warn(
+                        "MikroTik connection failed ({}); reconnecting ({}/{})",
+                        e.message,
+                        attempt + 1,
+                        MAX_RETRIES
+                )
+                closeConnection()
             }
-        } catch (Exception e) {
-            throw new RuntimeException("Unknown exception executing command: $command", e)
         }
+        throw new IllegalStateException("MikroTik command retry loop ended unexpectedly")
+    }
+
+    static boolean isRetryableConnectionFailure(Throwable error) {
+        Set<String> retryableMessages = [
+                "timed out",
+                "timeout",
+                "broken pipe",
+                "connection reset",
+                "socket closed",
+                "connection closed",
+                "not connected",
+                "connection aborted",
+                "end of stream",
+                "eof",
+                "mikrotik is unavailable"
+        ]
+        Throwable current = error
+        while (current != null) {
+            String message = current.message?.toLowerCase(Locale.ROOT) ?: ""
+            if (retryableMessages.any { message.contains(it) }) {
+                return true
+            }
+            current = current.cause
+        }
+        return false
     }
 
     Integer getHostNumber() {
@@ -66,6 +95,12 @@ class MikroTikExecutor {
     }
 
     protected synchronized void initializeConnection() {
+        if (!mikrotikGateway || !mikrotikUser || !mikrotikPassword) {
+            log.warn("MikroTik connection is disabled: set GATEWAY, MIKROTIK_USER and MIKROTIK_PASSWORD")
+            isConfigured = false
+            connect = null
+            return
+        }
         try {
             if (connect != null && connect.isConnected()) {
                 connect.close()
@@ -78,15 +113,32 @@ class MikroTikExecutor {
                 setSettings()
                 setWgInterfaces()
             }
+            log.info("Connected to MikroTik at {}", mikrotikGateway)
         } catch (Exception e) {
-            throw new RuntimeException("Failed to connect to MikroTik: ${e.message}", e)
+            log.error("Failed to connect to MikroTik: {}", e.message)
+            isConfigured = false
+            connect = null
         }
     }
 
-    protected synchronized void reconnect() {
+    private void ensureConnected() {
         if (connect == null || !connect.isConnected()) {
             log.info("Reconnecting to MikroTik...")
             initializeConnection()
+        }
+        if (connect == null || !connect.isConnected()) {
+            throw new IllegalStateException("MikroTik is unavailable")
+        }
+    }
+
+    private void closeConnection() {
+        try {
+            connect?.close()
+        } catch (Exception e) {
+            log.debug("Failed to close stale MikroTik connection", e)
+        } finally {
+            connect = null
+            isConfigured = false
         }
     }
 
@@ -100,6 +152,12 @@ class MikroTikExecutor {
 
     void setSettings() {
         settings = readSettings()
+    }
+
+    synchronized void reconnectIfNeeded() {
+        if (connect == null || !connect.isConnected()) {
+            initializeConnection()
+        }
     }
 
     private MikroTikSettings readSettings() {
@@ -116,6 +174,9 @@ class MikroTikExecutor {
     private List<WgInterface> getInterfaces() {
         String ipRouteName = System.getenv("IP_ROUTE_NAME") ?: "WGMTEasy"
         List<Map<String, String>> routes = executeCommand("/ip/route/print where comment=\"${ipRouteName}\"")
+        Map<String, Map<String, String>> statsByName = executeCommand("/interface/print stats")
+                .findAll { it.get("name") }
+                .collectEntries { [(it.get("name")): it] }
 
         return executeCommand('/interface/wireguard/print').collect {
             WgInterface wgInterface = new WgInterface()
@@ -126,13 +187,11 @@ class MikroTikExecutor {
             wgInterface.mtu = it.get('mtu')
             wgInterface.disabled = it.get('disabled').toBoolean()
 
-            Map<String, String> intStats = executeCommand(
-                    "/interface/print stats where name=${wgInterface.name}"
-            ).first()
-            wgInterface.rxByte = intStats.get("rx-byte")
-            wgInterface.txByte = intStats.get("tx-byte")
+            Map<String, String> intStats = statsByName.get(wgInterface.name) ?: [:]
+            wgInterface.rxByte = intStats.get("rx-byte") ?: "0"
+            wgInterface.txByte = intStats.get("tx-byte") ?: "0"
 
-            if (wgInterface.name != settings.inputWgInterfaceName) {
+            if (wgInterface.name != settings?.inputWgInterfaceName) {
                 wgInterface.isRouting = routes.any { route -> route.gateway == wgInterface.name }
             }
 

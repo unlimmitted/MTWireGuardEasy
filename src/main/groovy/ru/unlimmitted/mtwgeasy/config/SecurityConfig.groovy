@@ -5,9 +5,9 @@ import org.springframework.context.annotation.Configuration
 import org.springframework.security.authentication.AuthenticationManager
 import org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration
 import org.springframework.security.config.annotation.web.builders.HttpSecurity
-import org.springframework.security.crypto.password.NoOpPasswordEncoder
 import org.springframework.security.web.SecurityFilterChain
-import org.springframework.security.web.savedrequest.HttpSessionRequestCache
+import org.springframework.security.web.csrf.CookieCsrfTokenRepository
+import org.springframework.security.web.csrf.CsrfTokenRequestAttributeHandler
 import ru.unlimmitted.mtwgeasy.services.CustomAuthenticationProvider
 
 @Configuration
@@ -21,13 +21,18 @@ class SecurityConfig {
 
     @Bean
     SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
-        HttpSessionRequestCache requestCache = new HttpSessionRequestCache()
+        CookieCsrfTokenRepository csrfRepository = CookieCsrfTokenRepository.withHttpOnlyFalse()
+        CsrfTokenRequestAttributeHandler csrfRequestHandler = new CsrfTokenRequestAttributeHandler()
         return http
-                .csrf().disable()
+                .authenticationProvider(customAuthenticationProvider)
+                .csrf(csrf -> csrf
+                        .csrfTokenRepository(csrfRepository)
+                        .csrfTokenRequestHandler(csrfRequestHandler)
+                )
                 .authorizeHttpRequests(authorize -> authorize
                         .requestMatchers("/js/**", "/css/**", "/logo.png",
-                                "/favicon.png").permitAll()
-                        .requestMatchers("/login").permitAll()
+                                "/favicon.png", "/FeatureMono.ttf").permitAll()
+                        .requestMatchers("/login", "/auth/csrf").permitAll()
                         .anyRequest().authenticated()
                 )
                 .formLogin(form -> form
@@ -49,10 +54,5 @@ class SecurityConfig {
     @Bean
     AuthenticationManager authenticationManager(AuthenticationConfiguration authConfig) throws Exception {
         return authConfig.getAuthenticationManager()
-    }
-
-    @Bean
-    static NoOpPasswordEncoder passwordEncoder() {
-        return NoOpPasswordEncoder.getInstance()
     }
 }

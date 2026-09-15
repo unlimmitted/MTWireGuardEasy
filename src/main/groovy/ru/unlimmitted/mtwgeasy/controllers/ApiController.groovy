@@ -10,6 +10,7 @@ import ru.unlimmitted.mtwgeasy.dto.WgInterface
 
 import ru.unlimmitted.mtwgeasy.services.MikroTikFiles
 import ru.unlimmitted.mtwgeasy.services.MikroTikService
+import ru.unlimmitted.mtwgeasy.services.PeerTrafficService
 
 @RestController
 @RequestMapping("/api/v1")
@@ -20,6 +21,9 @@ class ApiController {
 
     @Autowired
     MikroTikFiles mikroTikFiles
+
+    @Autowired
+    PeerTrafficService peerTrafficService
 
     @GetMapping("/get-wg-peers")
     ResponseEntity<Object> getWgPeers() {
@@ -74,6 +78,11 @@ class ApiController {
     @GetMapping("/get-traffic-by-minutes")
     ResponseEntity<Object> getTrafficByMinutes() {
         return ResponseEntity.ok().body(mikroTikFiles.getTrafficByMinutes())
+    }
+
+    @GetMapping("/peer-traffic")
+    ResponseEntity<Object> getPeerTraffic(@RequestParam("peerId") String peerId) {
+        return ResponseEntity.ok().body(peerTrafficService.getHistory(peerId))
     }
 
     @GetMapping("/get-ether-interfaces")

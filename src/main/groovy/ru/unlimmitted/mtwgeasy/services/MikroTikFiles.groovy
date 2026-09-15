@@ -12,15 +12,25 @@ import java.time.Instant
 import java.time.temporal.ChronoUnit
 
 @Service
-class MikroTikFiles extends MikroTikExecutor {
+class MikroTikFiles {
 
     private static final Logger log = LoggerFactory.getLogger(MikroTikFiles.class)
 
     @Autowired
     TrafficRateRepository trafficRateRepository
 
+    @Autowired
+    MikroTikService mikroTikService
+
     void saveInterfaceTraffic() {
-        def inputInterface = wgInterfaces.find { it.name == settings.inputWgInterfaceName }
+        def settings = mikroTikService.settings
+        if (settings == null) {
+            log.debug("MikroTik settings are not loaded, skipping traffic save")
+            return
+        }
+        def inputInterface = (mikroTikService.wgInterfaces ?: []).find {
+            it.name == settings.inputWgInterfaceName
+        }
         if (inputInterface == null) {
             log.warn("Input WireGuard interface '{}' not found, skipping traffic save", settings.inputWgInterfaceName)
             return
