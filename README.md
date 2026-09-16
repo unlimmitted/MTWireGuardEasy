@@ -1,39 +1,120 @@
-**Frontend : https://github.com/unlimmitted/MTWireGuardEasy-frontend**
+# MikroTik WireGuard Easy
 
-MikroTik system requirements: 
-1. Only **_MikroTik RouterBoard_** or **_MikroTik CHR_**
-2. **_2 Kb_** of free space
-3. RouterOS **_not lower 7.15_** 
+Web-интерфейс для управления WireGuard на MikroTik RouterOS.
 
-## **Launch command**
+Frontend: [MTWireGuardEasy-frontend](https://github.com/unlimmitted/MTWireGuardEasy-frontend)
+
+## Требования
+
+- MikroTik RouterBoard или MikroTik CHR;
+- RouterOS 7.15 или новее;
+- включённый RouterOS API;
+- Docker с включённым BuildKit.
+
+## Сборка Docker-образа
+
+Из корня backend-репозитория выполните:
+
 ```bash
-docker build --tag mtwgeasy . && docker run --name MTWGEasy \
- -d -p 8080:8080 \
- -e GATEWAY=<you-mikrotik-ip> \
- -e MIKROTIK_USER=<you-mikrotik-admin-login> \
- -e MIKROTIK_PASSWORD=<you-mikrotik-pass> \
- -e IP_ROUTE_NAME=WGMTEasy \
- mtwgeasy
+docker build --pull -t mtwgeasy:latest .
 ```
 
+Во время сборки Docker автоматически:
+
+1. загружает frontend;
+2. устанавливает зависимости через `npm ci`;
+3. собирает статические файлы;
+4. собирает executable Spring Boot JAR;
+5. создаёт runtime-образ только с Java 21 JRE.
+
+По умолчанию используется ветка `master` frontend-репозитория. Для воспроизводимой сборки рекомендуется передавать тег или commit SHA:
+
+```bash
+docker build --pull \
+  --build-arg FRONTEND_REF=FRONTEND_TAG_OR_COMMIT \
+  -t mtwgeasy:latest .
 ```
-http://localhost:8080
+
+Если нужно использовать fork frontend:
+
+```bash
+docker build --pull \
+  --build-arg FRONTEND_REPOSITORY=https://github.com/OWNER/REPOSITORY.git \
+  --build-arg FRONTEND_REF=BRANCH_TAG_OR_COMMIT \
+  -t mtwgeasy:latest .
 ```
 
-## **Settings**
-#### **Only wireguard server**
-![photo_2024-09-22_17-19-24](https://github.com/user-attachments/assets/956d8d75-caaf-4135-ac1c-fe40fcccb047)
+Повторные сборки используют кэши npm и Gradle. Чтобы принудительно получить свежее состояние изменяемой ветки frontend, выполните сборку с `--no-cache` либо передайте точный новый commit SHA в `FRONTEND_REF`.
 
-#### **VPN chain mode**
-**For the settings to appear, you need to activate the Enable Double WireGuard VPN checkbox**
-###### Added a function to import from the WireGuard .conf file
-![photo_2024-09-23_19-18-57](https://github.com/user-attachments/assets/db1b7cfb-501a-45e3-b398-2252fd386df1)
+## Запуск
 
+Создайте постоянный Docker volume для SQLite-базы и запустите контейнер:
 
-## **Appearance:**
+```bash
+docker volume create mtwgeasy-data
 
-###### _Main screen_
-![Скриншот сделанный 2024-09-21 в 22 30 11](https://github.com/user-attachments/assets/0ef41b8a-57da-4c79-8c8c-ae82245f43ed)
+docker run --name mtwgeasy \
+  --detach \
+  --restart unless-stopped \
+  --publish 8080:8080 \
+  --env GATEWAY=192.168.88.1 \
+  --env MIKROTIK_USER=admin \
+  --env MIKROTIK_PASSWORD=CHANGE_ME \
+  --env IP_ROUTE_NAME=WGMTEasy \
+  --volume mtwgeasy-data:/data \
+  mtwgeasy:latest
+```
 
-###### **Peer modal**
-![peerModal](https://github.com/user-attachments/assets/578e0438-1879-4757-8443-76f33079d9eb)
+После запуска откройте [http://localhost:8080](http://localhost:8080). Для входа используются значения `MIKROTIK_USER` и `MIKROTIK_PASSWORD`.
+
+### Переменные окружения
+
+| Переменная | Обязательная | Назначение | Значение по умолчанию |
+| --- | --- | --- | --- |
+| `GATEWAY` | да | IP-адрес или hostname MikroTik | — |
+| `MIKROTIK_USER` | да | Пользователь RouterOS API и web-интерфейса | — |
+| `MIKROTIK_PASSWORD` | да | Пароль RouterOS API и web-интерфейса | — |
+| `IP_ROUTE_NAME` | нет | Комментарий маршрута, которым управляет приложение | `WGMTEasy` |
+| `DB_PATH` | нет | Путь к SQLite-базе внутри контейнера | `/data/db.sqlite` |
+
+Не передавайте пароль прямо в историю shell на общих системах. Для production используйте механизм secrets вашего оркестратора.
+
+## Обновление
+
+Соберите новый образ и пересоздайте контейнер, оставив тот же volume `mtwgeasy-data`. Данные статистики и настройки в SQLite сохранятся:
+
+```bash
+docker stop mtwgeasy
+docker rm mtwgeasy
+
+docker run --name mtwgeasy \
+  --detach \
+  --restart unless-stopped \
+  --publish 8080:8080 \
+  --env GATEWAY=192.168.88.1 \
+  --env MIKROTIK_USER=admin \
+  --env MIKROTIK_PASSWORD=CHANGE_ME \
+  --env IP_ROUTE_NAME=WGMTEasy \
+  --volume mtwgeasy-data:/data \
+  mtwgeasy:latest
+```
+
+## Интерфейс
+
+### Настройка WireGuard-сервера
+
+![WireGuard server settings](https://github.com/user-attachments/assets/956d8d75-caaf-4135-ac1c-fe40fcccb047)
+
+### Режим VPN-цепочки
+
+Чтобы показать дополнительные настройки, включите **Double WireGuard VPN**. Конфигурацию также можно импортировать из файла WireGuard `.conf`.
+
+![VPN chain mode](https://github.com/user-attachments/assets/db1b7cfb-501a-45e3-b398-2252fd386df1)
+
+### Главный экран
+
+![Main screen](https://github.com/user-attachments/assets/0ef41b8a-57da-4c79-8c8c-ae82245f43ed)
+
+### Окно пира
+
+![Peer modal](https://github.com/user-attachments/assets/578e0438-1879-4757-8443-76f33079d9eb)
