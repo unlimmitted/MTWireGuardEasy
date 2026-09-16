@@ -2,6 +2,8 @@
 
 Web-интерфейс для управления WireGuard на MikroTik RouterOS.
 
+Backend написан на Kotlin и работает на Java 21 / Spring Boot 3.
+
 Frontend: [MTWireGuardEasy-frontend](https://github.com/unlimmitted/MTWireGuardEasy-frontend)
 
 ## Требования

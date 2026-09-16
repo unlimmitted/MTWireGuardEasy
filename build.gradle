@@ -1,5 +1,7 @@
 plugins {
-	id 'groovy'
+	id 'org.jetbrains.kotlin.jvm' version '1.9.25'
+	id 'org.jetbrains.kotlin.plugin.spring' version '1.9.25'
+	id 'org.jetbrains.kotlin.plugin.jpa' version '1.9.25'
 	id 'org.springframework.boot' version '3.3.3'
 	id 'io.spring.dependency-management' version '1.1.6'
 }
@@ -31,7 +33,8 @@ configurations.all {
 }
 
 dependencies {
-	implementation 'org.apache.groovy:groovy'
+	implementation 'org.jetbrains.kotlin:kotlin-reflect'
+	implementation 'com.fasterxml.jackson.module:jackson-module-kotlin'
 	implementation 'org.springframework.boot:spring-boot-starter'
 	// FIX: убрана явная зависимость jakarta.persistence-api:3.2.0 —
 	//      она перебивала resolutionStrategy.force и была корнем проблемы
@@ -44,9 +47,6 @@ dependencies {
 	implementation 'org.webjars:sockjs-client:1.0.2'
 	implementation 'org.webjars:stomp-websocket:2.3.3'
 
-	// FIX: lombok убран из compileOnly для Groovy-проекта — в Groovy он не работает
-	//      через annotation processor, только через compileOnly без эффекта
-
 	implementation 'org.bouncycastle:bcprov-jdk15on:1.70'
 	implementation group: 'org.whispersystems', name: 'curve25519-java', version: '0.5.0'
 
@@ -56,10 +56,16 @@ dependencies {
 	implementation files('libs/mikrotik-3.0.5.jar')
 
 	testImplementation 'org.springframework.boot:spring-boot-starter-test'
-	testImplementation 'junit:junit:4.13.1'
 	testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
 }
 
 tasks.named('test') {
 	useJUnitPlatform()
+}
+
+tasks.withType(org.jetbrains.kotlin.gradle.tasks.KotlinCompile).configureEach {
+	kotlinOptions {
+		freeCompilerArgs = ['-Xjsr305=strict']
+		jvmTarget = '21'
+	}
 }
