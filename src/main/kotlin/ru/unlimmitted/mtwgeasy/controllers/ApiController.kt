@@ -7,9 +7,11 @@ import org.springframework.web.bind.annotation.RequestBody
 import org.springframework.web.bind.annotation.RequestMapping
 import org.springframework.web.bind.annotation.RequestParam
 import org.springframework.web.bind.annotation.RestController
+import ru.unlimmitted.mtwgeasy.dto.DoubleVpnInversionRequest
 import ru.unlimmitted.mtwgeasy.dto.MikroTikSettings
 import ru.unlimmitted.mtwgeasy.dto.NewWireguardInterface
 import ru.unlimmitted.mtwgeasy.dto.Peer
+import ru.unlimmitted.mtwgeasy.dto.RenamePeerRequest
 import ru.unlimmitted.mtwgeasy.dto.WgInterface
 import ru.unlimmitted.mtwgeasy.services.MikroTikFiles
 import ru.unlimmitted.mtwgeasy.services.MikroTikService
@@ -38,11 +40,21 @@ class ApiController(
         return ResponseEntity.ok(mikroTikService.getPeers())
     }
 
+    @PostMapping("/rename-peer")
+    fun renamePeer(@RequestBody request: RenamePeerRequest): ResponseEntity<Any> {
+        mikroTikService.renamePeer(request)
+        return ResponseEntity.ok(mikroTikService.getPeers())
+    }
+
     @PostMapping("/change-routing-peer")
     fun changeRoutingPeer(@RequestBody peer: Peer): ResponseEntity<Any> {
         mikroTikService.changeRouting(peer)
         return ResponseEntity.ok(mikroTikService.getPeers())
     }
+
+    @PostMapping("/set-double-vpn-inversion")
+    fun setDoubleVpnInversion(@RequestBody request: DoubleVpnInversionRequest): ResponseEntity<Any> =
+        ResponseEntity.ok(mikroTikService.setDoubleVpnInversion(request.inverted))
 
     @PostMapping("/remove-peer")
     fun removePeer(@RequestBody peer: Peer): ResponseEntity<Any> {

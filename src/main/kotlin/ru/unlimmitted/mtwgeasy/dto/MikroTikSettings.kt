@@ -21,4 +21,5 @@ data class MikroTikSettings(
     var wanInterfaceName: String? = null,
     var externalWgPresharedKey: String? = null,
     var vpnChainMode: Boolean = false,
+    var doubleVpnInverted: Boolean = false,
 )

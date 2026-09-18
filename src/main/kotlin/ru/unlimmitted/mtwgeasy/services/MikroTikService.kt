@@ -1,5 +1,6 @@
 package ru.unlimmitted.mtwgeasy.services
 
+import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
 import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Service
 import org.whispersystems.curve25519.Curve25519
@@ -9,6 +10,7 @@ import ru.unlimmitted.mtwgeasy.dto.MikroTikInfo
 import ru.unlimmitted.mtwgeasy.dto.MikroTikSettings
 import ru.unlimmitted.mtwgeasy.dto.NewWireguardInterface
 import ru.unlimmitted.mtwgeasy.dto.Peer
+import ru.unlimmitted.mtwgeasy.dto.RenamePeerRequest
 import ru.unlimmitted.mtwgeasy.dto.WgInterface
 import java.util.Base64
 
@@ -122,12 +124,82 @@ class MikroTikService : MikroTikExecutor() {
         )
     }
 
+    fun renamePeer(request: RenamePeerRequest) {
+        val peerId = requireRouterOsId(request.id)
+        val peerName = requireSafeValue(request.name, "Peer name", 64)
+        val peers = getPeers()
+        val peer = peers.find { it.id == peerId }
+            ?: throw IllegalArgumentException("Peer was not found")
+
+        if (peers.any { it.id != peerId && it.name.equals(peerName, ignoreCase = true) }) {
+            throw IllegalArgumentException("Peer name already exists")
+        }
+        if (peer.name == peerName) return
+
+        executeCommand("/interface/wireguard/peers/set numbers=$peerId name=\"$peerName\"")
+        findPeerInAddressList(getAddressList(), peer.allowedAddress?.substringBefore('/'))
+            ?.id
+            ?.let(::requireRouterOsId)
+            ?.let { addressListId ->
+                executeCommand("/ip/firewall/address-list/set numbers=$addressListId comment=\"$peerName\"")
+            }
+    }
+
     fun changeRouting(peer: Peer) {
         val address = peer.allowedAddress?.substringBefore('/')
         val addressEntry = findPeerInAddressList(getAddressList(), address)
             ?: throw IllegalArgumentException("Peer routing entry was not found")
         val action = if (peer.doubleVpn) "disable" else "enable"
         executeCommand("/ip/firewall/address-list/$action numbers=${requireRouterOsId(addressEntry.id)}")
+    }
+
+    fun setDoubleVpnInversion(inverted: Boolean): MikroTikSettings {
+        val currentSettings = requireSettings()
+        if (!currentSettings.vpnChainMode) {
+            throw IllegalStateException("Double VPN mode is not configured")
+        }
+        if (currentSettings.doubleVpnInverted == inverted) return currentSettings
+
+        val routingMark = requireSafeValue(currentSettings.toVpnTableName, "Routing table name", 64)
+        val addressList = requireSafeValue(currentSettings.toVpnAddressList, "Address list name", 64)
+        val mangleRuleId = executeCommand(
+            "/ip/firewall/mangle/print where new-routing-mark=\"$routingMark\"",
+        ).firstOrNull { rule ->
+            rule["chain"] == "prerouting" &&
+                rule["in-interface"] == currentSettings.inputWgInterfaceName
+        }?.get(".id")?.let(::requireRouterOsId)
+            ?: throw IllegalStateException("Double VPN routing rule was not found")
+
+        val settingsFileId = executeCommand("/file/print where name=\"${MikroTikExecutor.SETTINGS_FILE}\"")
+            .firstOrNull()
+            ?.get(".id")
+            ?.let(::requireRouterOsId)
+            ?: throw IllegalStateException("MikroTik settings file was not found")
+
+        val updatedSettings = currentSettings.copy(doubleVpnInverted = inverted)
+        val sourceAddressList = if (inverted) "!$addressList" else addressList
+        val previousSourceAddressList = if (currentSettings.doubleVpnInverted) "!$addressList" else addressList
+
+        executeCommand(
+            "/ip/firewall/mangle/set numbers=$mangleRuleId src-address-list=\"$sourceAddressList\"",
+        )
+        try {
+            val json = jacksonObjectMapper()
+                .writeValueAsString(updatedSettings)
+                .replace("\"", "\\\"")
+            executeCommand("/file/set numbers=$settingsFileId contents='$json'")
+        } catch (exception: Exception) {
+            runCatching {
+                executeCommand(
+                    "/ip/firewall/mangle/set numbers=$mangleRuleId " +
+                        "src-address-list=\"$previousSourceAddressList\"",
+                )
+            }
+            throw exception
+        }
+
+        settings = updatedSettings
+        return updatedSettings
     }
 
     fun removePeer(peer: Peer) {

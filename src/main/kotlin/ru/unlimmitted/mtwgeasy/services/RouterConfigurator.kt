@@ -71,14 +71,20 @@ class RouterConfigurator(
             )
 
             wgAddress += "/24"
+            val sourceAddressList = if (routerSettings.doubleVpnInverted) {
+                "!${routerSettings.toVpnAddressList}"
+            } else {
+                routerSettings.toVpnAddressList
+            }
             executeCommand(
                 command(
                     "/ip/firewall/mangle/add",
+                    "comment=\"WGMTEasyDoubleVPN\"",
                     "action=mark-routing",
                     "chain=prerouting",
                     "src-address=$wgAddress",
                     "dst-address=!$wgAddress",
-                    "src-address-list=\"${routerSettings.toVpnAddressList}\"",
+                    "src-address-list=\"$sourceAddressList\"",
                     "in-interface=\"${routerSettings.inputWgInterfaceName}\"",
                     "new-routing-mark=\"${routerSettings.toVpnTableName}\"",
                     "passthrough=yes",
