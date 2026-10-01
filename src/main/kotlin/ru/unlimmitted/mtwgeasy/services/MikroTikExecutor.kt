@@ -46,13 +46,6 @@ open class MikroTikExecutor {
         throw IllegalStateException("MikroTik command retry loop ended unexpectedly")
     }
 
-    fun getHostNumber(): Int {
-        val hostNumbers = executeCommand("/interface/wireguard/peers/print").mapNotNull { peer ->
-            ALLOWED_ADDRESS_REGEX.find(peer["allowed-address"].orEmpty())?.groupValues?.get(1)?.toIntOrNull()
-        }
-        return (hostNumbers.maxOrNull() ?: 0) + 1
-    }
-
     fun isSettings(): Boolean = executeCommand("/file/print").any { it["name"] == SETTINGS_FILE }
 
     @Synchronized
@@ -162,7 +155,6 @@ open class MikroTikExecutor {
         const val SETTINGS_FILE = "WGMTSettings.conf"
         private const val MAX_RETRIES = 3
         private const val CONNECTION_TIMEOUT_MS = 5_000
-        private val ALLOWED_ADDRESS_REGEX = Regex("(?:\\d+\\.){3}(\\d{1,3})/\\d+")
         private val RETRYABLE_MESSAGES = setOf(
             "timed out",
             "timeout",

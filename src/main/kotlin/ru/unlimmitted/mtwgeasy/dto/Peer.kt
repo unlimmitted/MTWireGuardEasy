@@ -16,4 +16,5 @@ data class Peer(
     var lastHandshake: String? = null,
     var privateKey: String? = null,
     var doubleVpn: Boolean = false,
+    var disabled: Boolean = false,
 )

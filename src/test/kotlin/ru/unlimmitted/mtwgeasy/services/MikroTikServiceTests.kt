@@ -2,6 +2,7 @@ package ru.unlimmitted.mtwgeasy.services
 
 import org.junit.jupiter.api.Assertions.assertThrows
 import org.junit.jupiter.api.Assertions.assertTrue
+import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Test
 import org.mockito.Mockito.doAnswer
 import org.mockito.Mockito.never
@@ -9,9 +10,112 @@ import org.mockito.Mockito.spy
 import org.mockito.Mockito.verify
 import org.springframework.test.util.ReflectionTestUtils
 import ru.unlimmitted.mtwgeasy.dto.MikroTikSettings
+import ru.unlimmitted.mtwgeasy.dto.Peer
 import ru.unlimmitted.mtwgeasy.dto.RenamePeerRequest
 
 class MikroTikServiceTests {
+    @Test
+    fun reusesFirstFreeAddressBeforeCurrentMaximum() {
+        val peers = listOf(
+            mapOf("interface" to "WGMTEasyIn", "allowed-address" to "10.10.10.1/32"),
+            mapOf("interface" to "WGMTEasyIn", "allowed-address" to "10.10.10.2/32"),
+            mapOf("interface" to "WGMTEasyIn", "allowed-address" to "10.10.10.4/32"),
+            mapOf("interface" to "OtherWG", "allowed-address" to "10.10.10.3/32"),
+        )
+
+        val host = MikroTikService.firstAvailableHostNumber("10.10.10.1/32", "WGMTEasyIn", peers)
+
+        assertEquals(3, host)
+    }
+
+    @Test
+    fun reportsFullWireGuardSubnet() {
+        val peers = (2..254).map { host ->
+            mapOf("interface" to "WGMTEasyIn", "allowed-address" to "10.10.10.$host/32")
+        }
+
+        assertThrows(IllegalStateException::class.java) {
+            MikroTikService.firstAvailableHostNumber("10.10.10.1/32", "WGMTEasyIn", peers)
+        }
+    }
+
+    @Test
+    fun changesPeerStatusToRequestedValue() {
+        val service = spy(MikroTikService())
+        doAnswer { emptyList<Map<String, String>>() }
+            .`when`(service).executeCommand(org.mockito.ArgumentMatchers.anyString())
+
+        service.setPeerStatus(Peer(id = "*1", disabled = true))
+        service.setPeerStatus(Peer(id = "*2", disabled = false))
+
+        verify(service).executeCommand("/interface/wireguard/peers/disable numbers=*1")
+        verify(service).executeCommand("/interface/wireguard/peers/enable numbers=*2")
+    }
+
+    @Test
+    fun readsPeersThroughClientConfigApiOnNewRouterOs() {
+        val service = spy(MikroTikService())
+        ReflectionTestUtils.setField(
+            service,
+            "settings",
+            MikroTikSettings(inputWgInterfaceName = "WGMTEasyIn"),
+        )
+        doAnswer { invocation ->
+            when (invocation.getArgument<String>(0)) {
+                "/ip/firewall/address-list/print" -> emptyList<Map<String, String>>()
+                "/interface/wireguard/peers/print" -> listOf(
+                    mapOf(
+                        ".id" to "*1",
+                        "name" to "phone",
+                        "interface" to "WGMTEasyIn",
+                        "allowed-address" to "10.10.10.2/32",
+                        "client-allowed-address" to "0.0.0.0/0",
+                        "private-key" to "",
+                    ),
+                )
+                "/interface/wireguard/peers/show-client-config number=\"*1\" show-sensitive=yes" -> listOf(
+                    mapOf("conf" to "[Interface]\nPrivateKey = restored-private-key\nAddress = 10.10.10.2/32\n"),
+                )
+                else -> emptyList<Map<String, String>>()
+            }
+        }.`when`(service).executeCommand(org.mockito.ArgumentMatchers.anyString())
+
+        val peers = service.getPeers()
+
+        assertEquals(1, peers.size)
+        assertEquals("phone", peers.single().name)
+        assertEquals("restored-private-key", peers.single().privateKey)
+        verify(service).executeCommand(
+            "/interface/wireguard/peers/show-client-config number=\"*1\" show-sensitive=yes",
+        )
+    }
+
+    @Test
+    fun keepsLegacyPrivateKeyMethodForOldRouterOs() {
+        val service = spy(MikroTikService())
+        doAnswer { invocation ->
+            when (invocation.getArgument<String>(0)) {
+                "/ip/firewall/address-list/print" -> emptyList<Map<String, String>>()
+                "/interface/wireguard/peers/print" -> listOf(
+                    mapOf(
+                        ".id" to "*1",
+                        "name" to "phone",
+                        "private-key" to "legacy-private-key",
+                        "allowed-address" to "10.10.10.2/32",
+                    ),
+                )
+                else -> emptyList<Map<String, String>>()
+            }
+        }.`when`(service).executeCommand(org.mockito.ArgumentMatchers.anyString())
+
+        val peers = service.getPeers()
+
+        assertEquals("legacy-private-key", peers.single().privateKey)
+        verify(service, never()).executeCommand(
+            org.mockito.ArgumentMatchers.startsWith("/interface/wireguard/peers/show-client-config"),
+        )
+    }
+
     @Test
     fun renamesPeerAndMatchingAddressListComment() {
         val service = spy(MikroTikService())

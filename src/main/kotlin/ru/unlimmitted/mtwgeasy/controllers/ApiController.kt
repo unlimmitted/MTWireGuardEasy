@@ -52,6 +52,12 @@ class ApiController(
         return ResponseEntity.ok(mikroTikService.getPeers())
     }
 
+    @PostMapping("/set-peer-status")
+    fun setPeerStatus(@RequestBody peer: Peer): ResponseEntity<Any> {
+        mikroTikService.setPeerStatus(peer)
+        return ResponseEntity.ok(mikroTikService.getPeers())
+    }
+
     @PostMapping("/set-double-vpn-inversion")
     fun setDoubleVpnInversion(@RequestBody request: DoubleVpnInversionRequest): ResponseEntity<Any> =
         ResponseEntity.ok(mikroTikService.setDoubleVpnInversion(request.inverted))

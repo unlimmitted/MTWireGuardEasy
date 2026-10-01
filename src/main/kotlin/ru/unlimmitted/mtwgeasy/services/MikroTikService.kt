@@ -13,9 +13,12 @@ import ru.unlimmitted.mtwgeasy.dto.Peer
 import ru.unlimmitted.mtwgeasy.dto.RenamePeerRequest
 import ru.unlimmitted.mtwgeasy.dto.WgInterface
 import java.util.Base64
+import java.util.concurrent.ConcurrentHashMap
 
 @Service
 class MikroTikService : MikroTikExecutor() {
+    private val peerPrivateKeys = ConcurrentHashMap<String, String>()
+
     fun runConfigurator(settings: MikroTikSettings) {
         RouterConfigurator(settings).run()
         initializeConnection()
@@ -28,11 +31,14 @@ class MikroTikService : MikroTikExecutor() {
             .mapNotNull { entry -> entry.address?.let { address -> address to entry } }
             .toMap()
 
-        return executeCommand("/interface/wireguard/peers/print")
+        val rows = executeCommand("/interface/wireguard/peers/print")
+        val clientConfigApi = usesClientConfigApi(rows)
+
+        return rows
             .filter { values ->
-                !values["private-key"].isNullOrBlank() &&
-                    values["comment"] != "ExternalWG" &&
-                    values["comment"] != "InteriorWG"
+                !isReservedPeer(values) &&
+                    (clientConfigApi || !values["private-key"].isNullOrBlank()) &&
+                    (!clientConfigApi || values["interface"] == currentSettings?.inputWgInterfaceName)
             }
             .map { values ->
                 val interfaceName = values["interface"]
@@ -48,8 +54,9 @@ class MikroTikService : MikroTikExecutor() {
                     tx = values["tx"],
                     lastHandshake = values["last-handshake"],
                     rx = values["rx"],
-                    privateKey = values["private-key"],
+                    privateKey = resolvePeerPrivateKey(values, clientConfigApi),
                     name = values["name"],
+                    disabled = values["disabled"].toBoolean(),
                     currentEndpointPort = values["current-endpoint-port"],
                     currentEndpointAddress = values["current-endpoint-address"],
                     publicKey = wgInterface?.publicKey,
@@ -60,6 +67,32 @@ class MikroTikService : MikroTikExecutor() {
                     doubleVpn = addressEntry?.disabled == false,
                 )
             }
+    }
+
+    private fun resolvePeerPrivateKey(values: Map<String, String>, clientConfigApi: Boolean): String? {
+        values["private-key"]?.takeIf(String::isNotBlank)?.let { return it }
+        if (!clientConfigApi) return null
+        val id = values[".id"]?.takeIf(String::isNotBlank) ?: return null
+        peerPrivateKeys[id]?.let { return it }
+
+        val privateKey = runCatching {
+            executeCommand(
+                "/interface/wireguard/peers/show-client-config number=\"$id\" show-sensitive=yes",
+            )
+                .firstOrNull()
+                ?.get("conf")
+                ?.lineSequence()
+                ?.map(String::trim)
+                ?.firstOrNull { line -> line.substringBefore('=').trim().equals("PrivateKey", ignoreCase = true) }
+                ?.substringAfter('=')
+                ?.trim()
+                ?.takeIf(String::isNotBlank)
+        }.onFailure { exception ->
+            log.debug("Failed to read client config for WireGuard peer {}: {}", id, exception.message)
+        }.getOrNull()
+
+        if (privateKey != null) peerPrivateKeys[id] = privateKey
+        return privateKey
     }
 
     fun getEtherInterfaces(): List<EtherInterface> =
@@ -102,15 +135,22 @@ class MikroTikService : MikroTikExecutor() {
         return info
     }
 
+    @Synchronized
     fun createNewPeer(peerName: String) {
         val safePeerName = requireSafeValue(peerName, "Peer name", 64)
         val currentSettings = requireSettings()
         val privateKey = Base64.getEncoder().encodeToString(
             Curve25519.getInstance(Curve25519.JAVA).generateKeyPair().privateKey,
         )
-        val matcher = IPV4_PREFIX.find(currentSettings.inputWgAddress.orEmpty())
+        val inputAddress = currentSettings.inputWgAddress.orEmpty()
+        val prefix = inputAddress.substringBefore('/').split('.').takeIf { it.size == 4 }
             ?: throw IllegalStateException("Input WireGuard address is not configured correctly")
-        val ip = "${matcher.groupValues[1]}.${matcher.groupValues[2]}.${matcher.groupValues[3]}.${getHostNumber()}"
+        val host = firstAvailableHostNumber(
+            inputAddress,
+            currentSettings.inputWgInterfaceName.orEmpty(),
+            executeCommand("/interface/wireguard/peers/print"),
+        )
+        val ip = "${prefix.take(3).joinToString(".")}.$host"
         val peerQuery = command(
             "/interface/wireguard/peers/add",
             "interface=\"${currentSettings.inputWgInterfaceName}\"",
@@ -143,6 +183,12 @@ class MikroTikService : MikroTikExecutor() {
             ?.let { addressListId ->
                 executeCommand("/ip/firewall/address-list/set numbers=$addressListId comment=\"$peerName\"")
             }
+    }
+
+    fun setPeerStatus(peer: Peer) {
+        val peerId = requireRouterOsId(peer.id)
+        val action = if (peer.disabled) "disable" else "enable"
+        executeCommand("/interface/wireguard/peers/$action numbers=$peerId")
     }
 
     fun changeRouting(peer: Peer) {
@@ -283,13 +329,49 @@ class MikroTikService : MikroTikExecutor() {
 
     companion object {
         private val log = LoggerFactory.getLogger(MikroTikService::class.java)
-        private val IPV4_PREFIX = Regex("^(\\d{1,3})\\.(\\d{1,3})\\.(\\d{1,3})")
-        private val ROUTER_OS_ID = Regex("\\*?[0-9A-Fa-f]+")
+        private val ROUTER_OS_ID = Regex("\\*{1,2}[A-Za-z0-9]+")
         private val UNSAFE_VALUE = Regex("[\\r\\n\"';]")
 
         @JvmStatic
         fun findPeerInAddressList(lists: List<AddressList>, address: String?): AddressList? =
             lists.find { it.address == address }
+
+        @JvmStatic
+        fun usesClientConfigApi(rows: List<Map<String, String>>): Boolean =
+            rows.any { values ->
+                values.containsKey("client-allowed-address") || values.containsKey("client-endpoint")
+            }
+
+        @JvmStatic
+        fun isReservedPeer(values: Map<String, String>): Boolean =
+            listOf(values["comment"], values["name"]).any { value ->
+                value == "ExternalWG" || value == "InteriorWG"
+            }
+
+        @JvmStatic
+        fun firstAvailableHostNumber(
+            inputAddress: String,
+            inputInterface: String,
+            peers: List<Map<String, String>>,
+        ): Int {
+            val inputParts = inputAddress.substringBefore('/').split('.').mapNotNull(String::toIntOrNull)
+            if (inputParts.size != 4 || inputParts.any { it !in 0..255 }) {
+                throw IllegalStateException("Input WireGuard address is not configured correctly")
+            }
+            val prefix = inputParts.take(3)
+            val routerHost = inputParts[3]
+            val usedHosts = peers.asSequence()
+                .filter { peer -> peer["interface"].isNullOrBlank() || peer["interface"] == inputInterface }
+                .flatMap { peer -> peer["allowed-address"].orEmpty().split(',').asSequence() }
+                .map { address -> address.trim().substringBefore('/').split('.') }
+                .filter { parts -> parts.size == 4 && parts.take(3).mapNotNull(String::toIntOrNull) == prefix }
+                .mapNotNull { parts -> parts[3].toIntOrNull() }
+                .filter { host -> host in 1..254 }
+                .toSet()
+
+            return (1..254).firstOrNull { host -> host != routerHost && host !in usedHosts }
+                ?: throw IllegalStateException("WireGuard subnet has no free host address")
+        }
 
         private fun validateNewInterface(wgInterface: NewWireguardInterface) {
             wgInterface.name = requireSafeValue(wgInterface.name, "Interface name", 64)
